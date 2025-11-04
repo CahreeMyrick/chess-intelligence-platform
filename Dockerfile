@@ -1,40 +1,40 @@
-# --- Stage 1: build the C++ engine (small final image)
+# --- Stage 1: build the C++ engine (bitboard) ---
 FROM debian:stable-slim AS engine-builder
 RUN apt-get update && apt-get install -y --no-install-recommends g++ make cmake && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
-# Copy only what you need to compile the engine
-# (adjust these paths to your engine source layout)
-COPY engine/ ./    # e.g., CMakeLists.txt, src/*.cpp, include/*.h
-RUN mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release && cmake --build . --config Release
-# Suppose the binary outputs to build/chess_uci:
+
+# Copy the CMake project from the repo root
+COPY CMakeLists.txt ./
+COPY src/ ./src/
+COPY include/ ./include/
+COPY tools/ ./tools/
+# (optional) COPY tests/ ./tests/
+
+# Build only the bitboard engine target to save time
+RUN mkdir build && cd build \
+ && cmake .. -DCMAKE_BUILD_TYPE=Release \
+ && cmake --build . --config Release --target chess_uci_bb
 RUN test -f /src/build/chess_uci_bb
 
-# --- Stage 2: app image
+# --- Stage 2: Node app image ---
 FROM node:20-slim
 WORKDIR /app
-
-# Install OS deps your Node app may need
 RUN apt-get update && apt-get install -y --no-install-recommends tini && rm -rf /var/lib/apt/lists/*
 
-# Copy Node files & install
 COPY package*.json ./
 RUN npm ci --only=production
 
-# Copy app code
 COPY public/ ./public/
 COPY server.js ./
 
-# Copy engine binary from builder
-RUN mkdir -p engine
-COPY --from=engine-builder /src/build/chess_uci_bb ./engine/chess_uci_bb
-RUN chmod +x ./engine/chess_uci
-
-# Optional: create a writable dir for logs/PGN
-RUN mkdir -p /app/data
+# Copy the engine binary into the runtime image
+RUN mkdir -p /app/engine
+COPY --from=engine-builder /src/build/chess_uci_bb /app/engine/chess_uci_bb
+RUN chmod +x /app/engine/chess_uci_bb
 
 ENV NODE_ENV=production
 ENV PORT=8080
-ENV ENGINE_PATH=/engine/chess_uci
+ENV ENGINE_PATH=/app/engine/chess_uci_bb
 
 EXPOSE 8080
 ENTRYPOINT ["/usr/bin/tini","--"]
