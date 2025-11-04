@@ -15,7 +15,8 @@ const DEFAULT_SITE = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
 // Adjust this to your built engine path
 // const ENGINE_PATH = path.join(__dirname, "engine", "chess_engine"); // e.g. "./build/chess_uci"
 const ENGINE_PATH = process.env.ENGINE_PATH || '/app/engine/chess_uci_bb';
-const DATA_DIR = path.join(__dirname, "data");
+//const DATA_DIR = path.join(__dirname, "data");
+const DATA_DIR = process.env.DATA_DIR || "/app/data";
 
 // ensure data dir exists
 fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -398,6 +399,8 @@ app.get("/game/:id.pgn", (req, res) => {
   res.type("text/plain").send(pgn);
 });
 
+app.get("/health", (_req, res) => res.status(200).send("ok"));
+
 // ---- graceful shutdown ----
 function shutdown() {
   try { engine.kill("SIGTERM"); } catch {}
@@ -407,4 +410,5 @@ process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 
 // ---- start server ----
-app.listen(PORT, () => console.log(`HTTP on :${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`HTTP on :${PORT}`));
+// app.listen(PORT, () => console.log(`HTTP on :${PORT}`));

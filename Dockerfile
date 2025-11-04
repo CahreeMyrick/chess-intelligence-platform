@@ -8,11 +8,11 @@ COPY CMakeLists.txt ./
 COPY src/ ./src/
 COPY include/ ./include/
 COPY tools/ ./tools/
-# (optional) COPY tests/ ./tests/
+# (tests not needed)
 
 # Build only the bitboard engine target to save time
 RUN mkdir build && cd build \
- && cmake .. -DCMAKE_BUILD_TYPE=Release \
+ && cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF \
  && cmake --build . --config Release --target chess_uci_bb
 RUN test -f /src/build/chess_uci_bb
 
