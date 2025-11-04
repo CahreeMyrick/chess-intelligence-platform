@@ -1,0 +1,29 @@
+app = "ichigo-chess"
+primary_region = "sjc"
+
+# (no special [build] needed when using a Dockerfile)
+[processes]
+  app = "node server.js"
+
+[[mounts]]
+  source = "data"
+  destination = "/app/data"   # <— change from /data
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "connections"   # or "requests" if you prefer
+    soft_limit = 80
+    hard_limit = 100
+
+
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 1

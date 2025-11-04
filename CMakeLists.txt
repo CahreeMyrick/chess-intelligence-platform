@@ -10,6 +10,9 @@ add_library(chess
     src/game.cpp
     src/strategy_minimax.cpp
     src/eval.cpp
+    src/attacks.cpp
+    src/board_bb.cpp
+    src/search_bb.cpp  
 )
 target_include_directories(chess PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 # Speed flags (adjust for your toolchain)
@@ -22,12 +25,17 @@ target_link_libraries(chess_app PRIVATE chess)
 
 # --- perft tool
 add_executable(chess_perft tools/perft.cpp)
+add_executable(chess_perft_bb tools/perft_bb.cpp)
+
 target_link_libraries(chess_perft PRIVATE chess)
+target_link_libraries(chess_perft_bb PRIVATE chess)
 
 # --- UCI engine
 add_executable(chess_uci tools/uci_main.cpp)
 target_link_libraries(chess_uci PRIVATE chess)
-
+# --- Bitboard UCI engine
+add_executable(chess_uci_bb tools/uci_bb_main.cpp)
+target_link_libraries(chess_uci_bb PRIVATE chess)
 # --- Unit tests (simple)
 add_executable(chess_tests tests/test_chess.cpp)
 target_link_libraries(chess_tests PRIVATE chess)

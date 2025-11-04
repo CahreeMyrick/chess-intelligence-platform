@@ -293,7 +293,7 @@ int main() {
 
     switch (mode){
         case 5: cli_bitboard_hvh(); return 0;
-        case 6: cli_bitboard_hvai(true,  6 /*depth*/); return 0;
+        case 6: cli_bitboard_hvai(true,  1 /*depth*/); return 0;
         case 7: cli_bitboard_hvai(false, 6 /*depth*/); return 0;
         case 8: cli_bitboard_aivai(6,6,150); return 0;
         default: break; // fall through to classic engine modes
