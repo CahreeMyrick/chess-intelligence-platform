@@ -19,7 +19,7 @@ target_include_directories(chess PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # Speed flags (tweak to taste)
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
-  target_compile_options(chess PRIVATE -O3 -DNDEBUG -march=native)
+  target_compile_options(chess PRIVATE -O3 -DNDEBUG)
 endif()
 
 # ---- Tools / Apps ----

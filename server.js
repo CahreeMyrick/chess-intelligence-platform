@@ -10,12 +10,11 @@ try { BOOK = require("./book"); } catch { BOOK = {}; } // optional book
 const Database = require("better-sqlite3");
 
 // ---- config ----
-const PORT = process.env.PORT || 8080;
+const PORT = Number(process.env.PORT || 8080);
+const HOST = "0.0.0.0";
 const DEFAULT_SITE = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
-// Adjust this to your built engine path
-// const ENGINE_PATH = path.join(__dirname, "engine", "chess_engine"); // e.g. "./build/chess_uci"
-const ENGINE_PATH = process.env.ENGINE_PATH || '/app/engine/chess_uci_bb';
-//const DATA_DIR = path.join(__dirname, "data");
+// const ENGINE_PATH = path.join(__dirname, "engine", "chess_engine");
+const ENGINE_PATH = process.env.ENGINE_PATH || "/app/engine/chess_uci_bb";
 const DATA_DIR = process.env.DATA_DIR || "/app/data";
 
 // ensure data dir exists
@@ -29,7 +28,7 @@ CREATE TABLE IF NOT EXISTS games (
   id INTEGER PRIMARY KEY,
   created_at TEXT DEFAULT (datetime('now')),
   result TEXT DEFAULT '*',
-  moves TEXT DEFAULT '',     -- space-separated UCI
+  moves TEXT DEFAULT '',
   pgn   TEXT,
   time_control TEXT DEFAULT '5+0'
 );
@@ -41,8 +40,25 @@ function gameById(id){
 
 // ---- app bootstrap ----
 const app = express();
-app.use(express.static(path.join(__dirname, "public")));
+
+// IMPORTANT: behind a proxy (Fly/Render) so trust it for correct req.ip
+app.set("trust proxy", 1);
+
+// Basic hardening + parsers
+app.disable("x-powered-by");
 app.use(express.json({ limit: "100kb" }));
+app.use(express.urlencoded({ extended: false }));
+
+// Static files
+app.use(express.static(path.join(__dirname, "public")));
+
+// Optional: force-HTTPS behind proxy (uncomment if you want redirects)
+// app.use((req, res, next) => {
+//   if (req.get("x-forwarded-proto") === "http") {
+//     return res.redirect(301, "https://" + req.hostname + req.originalUrl);
+//   }
+//   next();
+// });
 
 // ---- engine process (single-process MVP) ----
 const engine = spawn(ENGINE_PATH, [], { stdio: ["pipe", "pipe", "inherit"] });
@@ -94,8 +110,18 @@ app.get("/healthz", async (_req, res) => {
   }
 });
 
+app.get("/health", (_req, res) => res.status(200).send("ok"));
+
 // ---- rate limit for engine endpoint ----
-app.use("/bestmove", rateLimit({ windowMs: 60_000, max: 30 }));
+// Configure AFTER trust proxy so req.ip is correct
+const bestmoveLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.ip,
+});
+app.use("/bestmove", bestmoveLimiter);
 
 // ---- opening book ----
 app.post("/bookmove", (req, res) => {
@@ -265,15 +291,12 @@ function gameFromMoves(movesUci) {
 }
 
 // ---- SQLite-backed game routes ----
-
-// Create a new game row
 app.post("/game/new", (req, res) => {
   const { time_control = "5+0" } = req.body || {};
   const info = DB.prepare("INSERT INTO games (time_control) VALUES (?)").run(time_control);
   res.json({ gameId: info.lastInsertRowid });
 });
 
-// Helper to normalize chess.js API across versions
 function api(g, nameNew, nameOld) {
   return typeof g[nameNew] === "function" ? g[nameNew].bind(g)
        : typeof g[nameOld] === "function" ? g[nameOld].bind(g)
@@ -293,17 +316,14 @@ app.post("/game/:id/move", (req, res) => {
   const g = gameFromMoves(prev);
   if (!g) return res.status(409).json({ error: "corrupt game history" });
 
-  // apply the new move
   const from = uci.slice(0,2), to = uci.slice(2,4);
   const promotion = uci[4] || undefined;
   const ok = g.move({ from, to, promotion });
   if (!ok) return res.status(422).json({ error: "illegal move" });
 
-  // Build the new list
   const next = prev.concat(uci);
   const nextStr = next.join(" ");
 
-  // Detect game end (support both old/new chess.js method names)
   const isCheckmate   = api(g, "isCheckmate", "in_checkmate")();
   const isStalemate   = api(g, "isStalemate", "in_stalemate")();
   const isDraw        = api(g, "isDraw", "in_draw")();
@@ -314,8 +334,7 @@ app.post("/game/:id/move", (req, res) => {
 
   if (isCheckmate) {
     over = true;
-    // After the move, g.turn() is the side TO MOVE (the loser in checkmate)
-    const loser = g.turn();               // 'w' or 'b'
+    const loser = g.turn();
     const winner = loser === 'w' ? 'b' : 'w';
     result = winner === 'w' ? "1-0" : "0-1";
     reason = "checkmate";
@@ -326,14 +345,11 @@ app.post("/game/:id/move", (req, res) => {
   } else if (isInsuff) {
     over = true; result = "1/2-1/2"; reason = "insufficient material";
   } else if (isDraw) {
-    // Generic draw condition (50-move rule, etc.)
     over = true; result = "1/2-1/2"; reason = "draw";
   }
 
-  // Persist moves
   DB.prepare("UPDATE games SET moves=? WHERE id=?").run(nextStr, id);
 
-  // If over, also snapshot PGN + result
   let pgn = null;
   if (over) {
     const movesUci = next;
@@ -350,17 +366,16 @@ app.post("/game/:id/move", (req, res) => {
     moves: nextStr,
     fen: g.fen(),
     over,
-    reason,   // e.g. "checkmate"
-    result,   // "1-0", "0-1", "1/2-1/2" or "*"
-    pgn       // null unless over==true
+    reason,
+    result,
+    pgn
   });
 });
 
-// Finish a game (sets result; also stores PGN snapshot)
 app.post("/game/:id/finish", (req, res) => {
   try {
     const id = Number(req.params.id);
-    const { result="*" } = req.body || {}; // "1-0","0-1","1/2-1/2","*"
+    const { result="*" } = req.body || {};
     const row = gameById(id); if (!row) return res.status(404).json({error:"not found"});
     const movesUci = row.moves ? row.moves.split(" ").filter(Boolean) : [];
     const pgn = uciListToPgn({ movesUci, headers: { Event:"Web Game", TimeControl: row.time_control }, result });
@@ -372,20 +387,17 @@ app.post("/game/:id/finish", (req, res) => {
   }
 });
 
-// Read one game
 app.get("/game/:id", (req, res) => {
   const id = Number(req.params.id);
   const row = gameById(id); if (!row) return res.status(404).json({error:"not found"});
   res.json(row);
 });
 
-// List recent games
 app.get("/games", (_req, res) => {
   const rows = DB.prepare("SELECT id, created_at, result, time_control FROM games ORDER BY id DESC LIMIT 50").all();
   res.json(rows);
 });
 
-// Direct PGN view
 app.get("/game/:id.pgn", (req, res) => {
   const id = Number(req.params.id);
   const row = DB.prepare("SELECT moves, pgn, time_control, result FROM games WHERE id=?").get(id);
@@ -399,7 +411,10 @@ app.get("/game/:id.pgn", (req, res) => {
   res.type("text/plain").send(pgn);
 });
 
-app.get("/health", (_req, res) => res.status(200).send("ok"));
+// Root fallback (serves index if no static file matched)
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
 
 // ---- graceful shutdown ----
 function shutdown() {
@@ -410,5 +425,4 @@ process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 
 // ---- start server ----
-app.listen(PORT, '0.0.0.0', () => console.log(`HTTP on :${PORT}`));
-// app.listen(PORT, () => console.log(`HTTP on :${PORT}`));
+app.listen(PORT, HOST, () => console.log(`HTTP on ${HOST}:${PORT}`));
