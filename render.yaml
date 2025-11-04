@@ -2,14 +2,14 @@ services:
   - type: web
     name: ichigo
     env: docker
-    plan: starter             # pick your plan
+    plan: starter
     autoDeploy: true
-    healthCheckPath: /health  # matches server.js
+    healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
       - key: ENGINE_PATH
-        value: /engine/chess_uci
+        value: /app/engine/chess_uci_bb
     disk:
       name: data
       mountPath: /app/data

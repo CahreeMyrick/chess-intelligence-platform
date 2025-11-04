@@ -13,7 +13,8 @@ const Database = require("better-sqlite3");
 const PORT = process.env.PORT || 8080;
 const DEFAULT_SITE = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
 // Adjust this to your built engine path
-const ENGINE_PATH = path.join(__dirname, "engine", "chess_engine"); // e.g. "./build/chess_uci"
+// const ENGINE_PATH = path.join(__dirname, "engine", "chess_engine"); // e.g. "./build/chess_uci"
+const ENGINE_PATH = process.env.ENGINE_PATH || '/app/engine/chess_uci_bb';
 const DATA_DIR = path.join(__dirname, "data");
 
 // ensure data dir exists

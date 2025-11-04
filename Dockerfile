@@ -4,10 +4,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends g++ make cmake 
 WORKDIR /src
 # Copy only what you need to compile the engine
 # (adjust these paths to your engine source layout)
-COPY engine_src/ ./    # e.g., CMakeLists.txt, src/*.cpp, include/*.h
+COPY engine/ ./    # e.g., CMakeLists.txt, src/*.cpp, include/*.h
 RUN mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release && cmake --build . --config Release
 # Suppose the binary outputs to build/chess_uci:
-RUN test -f /src/build/chess_uci
+RUN test -f /src/build/chess_uci_bb
 
 # --- Stage 2: app image
 FROM node:20-slim
@@ -26,7 +26,7 @@ COPY server.js ./
 
 # Copy engine binary from builder
 RUN mkdir -p engine
-COPY --from=engine-builder /src/build/chess_uci ./engine/chess_uci
+COPY --from=engine-builder /src/build/chess_uci_bb ./engine/chess_uci_bb
 RUN chmod +x ./engine/chess_uci
 
 # Optional: create a writable dir for logs/PGN
