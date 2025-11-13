@@ -9,12 +9,14 @@ let BOOK = {};
 try { BOOK = require("./book"); } catch { BOOK = {}; } // optional book
 const Database = require("better-sqlite3");
 
+
 // ---- config ----
 const PORT = Number(process.env.PORT || 8080);
 const HOST = "0.0.0.0";
 const DEFAULT_SITE = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
 // const ENGINE_PATH = path.join(__dirname, "engine", "chess_engine");
 const ENGINE_PATH = process.env.ENGINE_PATH || "/app/engine/chess_uci_bb";
+//const ENGINE_PATH = process.env.ENGINE_PATH || ""
 const DATA_DIR = process.env.DATA_DIR || "/app/data";
 
 // ensure data dir exists
@@ -37,6 +39,8 @@ function gameById(id){
   return DB.prepare(`SELECT id, created_at, result, moves, pgn, time_control
                      FROM games WHERE id=?`).get(id);
 }
+
+const fetch = (...args) => import('node-fetch').then(({default: f}) => f(...args));
 
 // ---- app bootstrap ----
 const app = express();
@@ -290,6 +294,7 @@ function gameFromMoves(movesUci) {
   return g;
 }
 
+
 // ---- SQLite-backed game routes ----
 app.post("/game/new", (req, res) => {
   const { time_control = "5+0" } = req.body || {};
@@ -302,6 +307,194 @@ function api(g, nameNew, nameOld) {
        : typeof g[nameOld] === "function" ? g[nameOld].bind(g)
        : () => false;
 }
+
+
+// --- helpers for Chess.com daily PGN ---
+function extractSANFromPGN(pgnRaw = "") {
+  // Remove PGN tag pairs like [FEN "..."], keep only the move text
+  const text = String(pgnRaw).replace(/\r\n/g, "\n");
+  const body = text
+    .split("\n")
+    .filter(line => !/^\s*\[.*\]\s*$/.test(line)) // drop [Tag "..."]
+    .join(" ");
+
+  // Remove move numbers ("1." or "1..."), results, and extra spaces
+  return body
+    .replace(/\d+\.(\.\.)?/g, " ")                    // 1. 1...
+    .replace(/\b(1-0|0-1|1\/2-1\/2|\*)\b/g, " ")      // results / *
+    .replace(/\s*\{[^}]*\}\s*/g, " ")                 // comments {...}
+    .replace(/\s+/g, " ")                             // collapse spaces
+    .trim();
+}
+
+function sanToUciArray(fen, sanString) {
+  const game = new Chess(fen);            // start from puzzle FEN
+  const tokens = String(sanString || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  const uci = [];
+  for (const san of tokens) {
+    const m = game.move(san, { sloppy: true }); // accepts Kd7, Bxb6+, e8=Q, O-O, etc.
+    if (!m) throw new Error(`SAN could not be applied: "${san}"`);
+    uci.push(m.from + m.to + (m.promotion ? m.promotion : ""));
+  }
+  return uci;
+}
+
+// --- Chess.com daily puzzle (PGN-aware, with fallback) ---
+app.get("/puzzles/daily", async (_req, res) => {
+  const fallback = {
+    id: "fallback-queen-mate",
+    source: "fallback",
+    fen: "7k/5Q2/7K/8/8/8/8/8 w - - 0 1",
+    moves: ["f7g7"], // Qg7#
+    rating: 1200,
+    themes: ["mateIn1","basic"],
+  };
+
+  const fetchJson = async (url, { timeoutMs = 5000 } = {}) => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const r = await fetch(url, {
+        headers: {
+          "User-Agent": "Ichigo/1.0",
+          "Accept": "application/json"
+        },
+        signal: ctrl.signal,
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return await r.json();
+    } finally {
+      clearTimeout(t);
+    }
+  };
+
+  try {
+    const j = await fetchJson("https://api.chess.com/pub/puzzle").catch(err => {
+      console.error("[/puzzles/daily] chess.com fetch failed:", err);
+      return null;
+    });
+    if (!j) return res.json(fallback);
+
+    // Your sample:
+    // { title,url,publish_time,fen,pgn:"[...]\n\n1. Kd7 Nb6+ 2. Bxb6 *", image }
+    const fen = j.fen || j.FEN;
+    if (!fen) {
+      console.warn("[/puzzles/daily] missing FEN; using fallback");
+      return res.json(fallback);
+    }
+
+    // Prefer explicit 'moves' if Chess.com ever supplies it; else extract from PGN
+    let san = null;
+    if (typeof j.moves === "string" && j.moves.trim()) {
+      san = j.moves.trim();
+    } else if (typeof j.pgn === "string" && j.pgn.trim()) {
+      san = extractSANFromPGN(j.pgn);
+    }
+
+    if (!san) {
+      console.warn("[/puzzles/daily] no SAN found; using fallback");
+      return res.json(fallback);
+    }
+
+    let moves;
+    try {
+      moves = sanToUciArray(fen, san);  // SAN → UCI using puzzle FEN
+    } catch (e) {
+      console.error("[/puzzles/daily] SAN→UCI failed; using fallback:", e);
+      return res.json(fallback);
+    }
+
+    if (!Array.isArray(moves) || !moves.length) {
+      console.warn("[/puzzles/daily] empty UCI after convert; using fallback");
+      return res.json(fallback);
+    }
+
+    const id = j.id || j.title || j.url || `chesscom-${j.publish_time || Date.now()}`;
+    const themes = Array.isArray(j.themes)
+      ? j.themes
+      : (typeof j.themes === "string" ? j.themes.split(",").map(s => s.trim()).filter(Boolean) : []);
+
+    return res.json({
+      id,
+      source: "chess.com",
+      fen,
+      moves,
+      rating: j.rating || null,
+      themes,
+      // debug fields (keep while iterating; remove if you want):
+      _title: j.title || null,
+      _san: san,
+      _pgnSeen: !!j.pgn,
+      _url: j.url || null,
+    });
+  } catch (e) {
+    console.error("[/puzzles/daily] unexpected error:", e);
+    return res.json(fallback);
+  }
+});
+
+// --- Chess.com random puzzle (SAN -> UCI) ---
+app.get("/puzzles/random", async (_req, res) => {
+  try {
+    const r = await fetch("https://api.chess.com/pub/puzzle/random", {
+      headers: { "User-Agent": "Ichigo/1.0 (+your-email-or-site)" }
+    });
+    if (!r.ok) return res.status(502).json({ error: `chess.com ${r.status}` });
+
+    const j = await r.json();
+    // Expect: { fen, pgn, title, moves (SAN string), rating, themes, url, ... }
+    if (!j.fen || (!j.moves && !j.pgn)) {
+      return res.status(502).json({ error: "chess.com random: missing fen/moves" });
+    }
+
+    // Prefer explicit SAN list if present; else extract SAN from PGN
+    let san = "";
+    if (typeof j.moves === "string" && j.moves.trim()) {
+      san = j.moves;
+    } else if (typeof j.pgn === "string") {
+      // Cheap PGN → SAN list: split the last line with moves (after headers)
+      const body = j.pgn.split(/\r?\n/).filter(l => l && !l.startsWith("[")).join(" ");
+      // remove result tokens and move numbers
+      san = body
+        .replace(/\d+\.(\.\.)?/g, " ")
+        .replace(/\s*(1-0|0-1|1\/2-1\/2|\*)\s*$/,"")
+        .trim();
+    }
+
+    let moves = [];
+    try {
+      moves = sanToUciArray(j.fen, san);
+    } catch (e) {
+      return res.status(502).json({ error: "random SAN→UCI failed", detail: String(e) });
+    }
+
+    let themes = [];
+    if (Array.isArray(j.themes)) themes = j.themes;
+    else if (typeof j.themes === "string") themes = j.themes.split(",").map(s => s.trim());
+
+    const id = j.id || j.title || j.url || "random";
+
+    res.json({
+      id,
+      fen: j.fen,
+      moves,                 // UCI array for frontend
+      rating: j.rating || null,
+      themes,
+      source: "chess.com",
+      _san: san,
+      _title: j.title || null,
+      _puzzleUrl: j.url || null
+    });
+  } catch (e) {
+    res.status(502).json({ error: "random puzzle fetch failed", detail: String(e) });
+  }
+});
+
+
 
 app.post("/game/:id/move", (req, res) => {
   const id = Number(req.params.id);

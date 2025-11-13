@@ -1,607 +1,336 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8"/>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Ichigo</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <style>
-    .banner {
-      display:none;
-      margin:12px 0 0;
-      padding:12px 14px;
-      border:1px solid #2b3a61;
-      background:#0f1b37;
-      color:#eaf1ff;
-      border-radius:10px;
-      font-weight:600;
+    /* ========= Chess.com‑inspired dark green theme ========= */
+    :root{
+      --bg:#0f1410; --surface:#151b16; --surface-2:#1b221c; --text:#e6f2e6; --muted:#a7b7a9;
+      --accent:#5BA04E; --accent-2:#7BC769; --radius:16px; --shadow:0 6px 24px rgba(0,0,0,.35);
+      --square:64px; --light:#cce3d1; --dark:#2b3a2e;
     }
-    .banner .meta { font-weight:400; opacity:.9; margin-left:8px }
-    .banner .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-    .banner .btn { padding:6px 10px; }
-
-    :root { --square: 64px; --light:#f0d9b5; --dark:#b58863; --accent:#2563eb; --bg:#0b1020; --card:#121a2b; --text:#e8eefc; }
     @media (max-width:600px){ :root{ --square:44px; } }
-    *{ box-sizing:border-box }
-    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
-           background:linear-gradient(180deg,#0b1020,#0e1326 60%,#0b1020); color:var(--text); margin:0; }
-    .container{ max-width:1100px; margin:24px auto; padding:0 16px; }
-    header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; gap:12px; flex-wrap:wrap; }
-    header .title{ font-weight:700; letter-spacing:.2px; }
-    .toolbar{ display:flex; gap:12px; align-items:center; flex-wrap:wrap }
-    .card{ background:var(--card); border:1px solid #1f2a44; border-radius:14px; padding:12px }
-    .boardRow{ display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap }
-    #board { display:grid; grid-template-columns: repeat(8, var(--square)); grid-template-rows: repeat(8, var(--square));
-             border:1px solid #243252; border-radius:12px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,.35); transition:opacity .2s ease; }
-    .sq { display:flex; align-items:center; justify-content:center; font-size:38px; user-select:none; cursor:pointer; position:relative; }
-    .light { background:var(--light); } .dark { background:var(--dark); }
-    .sel { outline:3px solid var(--accent); outline-offset:-3px; }
-    .hl::after{ content:""; position:absolute; inset:0; background:rgba(37,99,235,.22); }
-    .piece { line-height:1; }
-    .piece.w { color:#ffffff; text-shadow:0 1px 1px rgba(0,0,0,.35); }
-    .piece.b { color:#111111; text-shadow:0 1px 0 rgba(255,255,255,.25); }
-    .btn{ padding:8px 12px; border-radius:10px; border:1px solid #2b3a61; background:#18223a; color:#eaf1ff; cursor:pointer }
-    .btn:hover{ background:#1b2743 }
-    .btn.red{ border-color:#5b2b2b; background:#3b1a1a }
-    .btn.red:hover{ background:#492020 }
-    .panel { flex:1; min-width:260px; display:flex; flex-direction:column; gap:12px }
-    .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap }
-    .label { font-size:.92rem; opacity:.9 }
-    input[type=number], select, input[type=range] { background:#0f1527; color:#e8eefc; border:1px solid #223154; border-radius:8px; padding:6px 8px }
-    .status{ display:flex; gap:10px; align-items:center; flex-wrap:wrap }
-    .dot{ width:8px; height:8px; border-radius:999px; background:#ccc; }
-    .spin{ width:14px; height:14px; border:2px solid #2e3b61; border-top-color:#6ea3ff; border-radius:999px; animation:spin 1s linear infinite; }
-    @keyframes spin{ to{ transform:rotate(360deg) } }
-    .clocks{ display:flex; gap:12px }
-    .clock{ flex:1; text-align:center; padding:10px; border-radius:10px; background:#0d1426; border:1px solid #213053; }
-    .clock strong{ display:block; font-size:1.2rem }
-    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace }
-    pre { background:#0b1327; padding:10px; border-radius:10px; max-height:260px; overflow:auto; border:1px solid #1a2747 }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0; font:16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Helvetica, Arial;
+      color:var(--text); background:linear-gradient(180deg,#0d130f 0%, #0b100c 100%);}
+    a{color:inherit; text-decoration:none}
+    .container{max-width:1200px; margin:0 auto; padding:0 16px}
+
+    /* ===== Topbar ===== */
+    .topbar{position:sticky; top:0; z-index:50; backdrop-filter:saturate(120%) blur(6px);
+      background:rgba(15,20,16,.8); border-bottom:1px solid rgba(123,199,105,.12)}
+    .nav{display:flex; align-items:center; justify-content:space-between; height:64px}
+    .brand{display:flex; align-items:center; gap:10px; font-weight:800}
+    .brand .logo{width:28px; height:28px; display:grid; place-items:center; border-radius:8px;
+      background:radial-gradient(70% 70% at 30% 30%, var(--accent-2), var(--accent));
+      box-shadow:0 3px 12px rgba(123,199,105,.35)}
+    .nav-links{display:flex; gap:18px; align-items:center}
+    .nav-links a{padding:8px 10px; border-radius:10px; color:var(--muted)}
+    .nav-links a.active, .nav-links a:hover{background:var(--surface-2); color:var(--text)}
+    .actions{display:flex; align-items:center; gap:12px}
+    .btn{padding:8px 12px; border-radius:12px; display:inline-flex; align-items:center; gap:8px; font-weight:600; border:1px solid transparent; cursor:pointer}
+    .btn.ghost{background:transparent; color:var(--text); border-color:rgba(123,199,105,.25)}
+    .btn.primary{background:linear-gradient(180deg, var(--accent-2), var(--accent)); color:#0a120a; box-shadow:0 8px 20px rgba(91,160,78,.35)}
+    .btn.primary:hover{filter:saturate(105%)}
+    .btn.ghost:hover{background:var(--surface-2)}
+
+    /* ===== Cards & layout ===== */
+    .card{background:var(--surface); border:1px solid rgba(123,199,105,.10); border-radius:var(--radius); box-shadow:var(--shadow)}
+    .pad{padding:16px}
+    .hero{padding:20px 0 12px}
+    .hero-grid{display:grid; grid-template-columns:1.1fr .9fr; gap:20px}
+    .strip{display:flex; gap:12px; margin-top:12px}
+    .tile{flex:1; padding:12px 14px; background:var(--surface-2); border-radius:12px; border:1px solid rgba(123,199,105,.10)}
+    .label{font-size:.92rem; color:var(--muted)}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace}
+
+    /* ===== Board (kept from your logic; recolored) ===== */
+    #board{ display:grid; grid-template-columns:repeat(8, var(--square)); grid-template-rows:repeat(8, var(--square));
+      border:1px solid rgba(123,199,105,.15); border-radius:14px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,.35); transition:opacity .2s ease }
+    .sq{ display:flex; align-items:center; justify-content:center; font-size:38px; user-select:none; cursor:pointer; position:relative }
+    .light{ background:var(--light) } .dark{ background:var(--dark) }
+    .sel{ outline:3px solid var(--accent); outline-offset:-3px }
+    .hl::after{ content:""; position:absolute; inset:0; background:rgba(123,199,105,.22) }
+    .piece{ line-height:1; filter:drop-shadow(0 2px 3px rgba(0,0,0,.35)) }
+    .piece.w{ color:#ffffff } .piece.b{ color:#111111 }
+
+    /* ===== Right panel widgets ===== */
+    .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+    .clocks{display:flex; gap:12px}
+    .clock{flex:1; text-align:center; padding:10px; border-radius:10px; background:var(--surface-2); border:1px solid rgba(123,199,105,.10)}
+    .clock strong{display:block; font-size:1.2rem}
+    input[type=number], select, input[type=range]{ background:#0f1512; color:var(--text); border:1px solid rgba(123,199,105,.22); border-radius:8px; padding:6px 8px }
+    pre{ background:#0f1512; padding:10px; border-radius:10px; max-height:260px; overflow:auto; border:1px solid rgba(123,199,105,.12) }
     .moves{ min-height:32px }
-    .pill{ padding:2px 8px; border-radius:999px; background:#0f1b37; border:1px solid #223154; }
-    .hint{ opacity:.8; font-size:.9rem; margin:4px 0 0 2px; }
-    .disabled { pointer-events:none; opacity:.6 }
-    #gameIdPill {
-      display: none !important; /* Force hide it */
-    }
+    .pill{ padding:2px 8px; border-radius:999px; background:var(--surface-2); border:1px solid rgba(123,199,105,.22) }
+    .spin{ width:14px; height:14px; border:2px solid rgba(123,199,105,.22); border-top-color:var(--accent-2); border-radius:999px; animation:spin 1s linear infinite }
+    @keyframes spin{ to{ transform:rotate(360deg) } }
+    .disabled{ pointer-events:none; opacity:.6 }
+
+    /* ===== Banner ===== */
+    .banner{ display:none; margin:12px 0 0; padding:12px 14px; border:1px solid rgba(123,199,105,.25);
+      background:var(--surface-2); color:var(--text); border-radius:12px; font-weight:600 }
+    .banner .meta{ font-weight:400; opacity:.9; margin-left:8px }
+
+    /* ===== Sections ===== */
+    .lower{display:grid; grid-template-columns:2fr 1fr; gap:16px}
+    @media (max-width:1000px){ .hero-grid{grid-template-columns:1fr} .lower{grid-template-columns:1fr} .nav-links{display:none} }
   </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <div class="title">♞ Ichigo</div>
-      <div class="toolbar">
-        <label class="label">Play as</label>
-        <select id="playAs">
-          <option value="w" selected>White</option>
-          <option value="b">Black</option>
-        </select>
-        <label class="label">Difficulty</label>
-        <input id="difficulty" type="range" min="1" max="5" step="1" value="2"/>
-        <span class="pill" id="diffLabel">2/5</span>
+  <!-- ===== Header ===== -->
+  <header class="topbar">
+    <div class="container nav">
+      <div class="brand"><div class="logo">♟</div><span>Ichigo</span></div>
+      <nav class="nav-links">
+        <a href="#" class="active">Play</a>
+        <a href="/puzzles.html">Puzzles</a>
 
-        <button class="btn" id="new">New Game</button>
-        <button class="btn" id="flip">Flip</button>
-        <button class="btn" id="engineMove">Engine Move</button>
-        <button class="btn red" id="finish">Finish</button>
-        <a class="btn" href="/games.html">My Games</a>
-        <span class="pill" id="gameIdPill" style="display:none"></span>
-      </div>
-    </header>
-
-    <div id="gameBanner" class="banner"></div>
-
-    <div class="hint">Click <strong>New Game</strong> to start. </div>
-
-    <div class="boardRow" style="margin-top:8px">
-      <div class="card">
-        <div id="board"></div>
-      </div>
-
-      <div class="panel">
-        <div class="card">
-          <div class="row status">
-            <div class="dot" id="thinkingDot"></div>
-            <span id="thinkingText">Idle</span>
-            <span class="pill mono" id="evalPill">eval: —</span>
-            <span class="pill mono" id="depthPill">d: —</span>
-            <span class="pill mono" id="npsPill">nps: —</span>
-            <span id="spinner" class="spin" style="display:none"></span>
-          </div>
-          <div class="row" style="margin-top:8px">
-            <div class="clocks" style="width:100%">
-              <div class="clock"><div>White</div><strong class="mono" id="wClock">05:00</strong></div>
-              <div class="clock"><div>Black</div><strong class="mono" id="bClock">05:00</strong></div>
-            </div>
-          </div>
-          <div class="row" style="margin-top:8px">
-            <label class="label">Move time (ms):</label>
-            <input id="ms" type="number" value="500" min="50" step="50">
-            <label class="label">Depth:</label>
-            <input id="depth" type="number" min="1" step="1" placeholder="">
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="label">Moves (UCI)</div>
-          <div class="mono moves" id="movesSpan"></div>
-        </div>
-
-        <div class="card">
-          <div class="label">Log</div>
-          <pre id="log"></pre>
-        </div>
+        <!--<a href="#">Learn</a>
+        <a href="#">Watch</a>
+        <a href="#">News</a>-->
+        
+      </nav>
+      <div class="actions">
+        <!-- <a class="btn ghost" href="/games.html">My Games</a> -->
+        <button class="btn primary" id="new">New Game</button>
       </div>
     </div>
-  </div>
+  </header>
 
+  <!-- ===== Main ===== -->
+  <main class="container">
+    <section class="hero hero-grid">
+      <!-- Left: Board & quick KPIs -->
+      <div class="card pad">
+        <div class="row" style="justify-content:space-between">
+          <div class="row">
+            <label class="label">Play as</label>
+            <select id="playAs">
+              <option value="w" selected>White</option>
+              <option value="b">Black</option>
+            </select>
+          </div>
+          <div class="row">
+            <label class="label">Difficulty</label>
+            <input id="difficulty" type="range" min="1" max="5" step="1" value="2"/>
+            <span class="pill" id="diffLabel">2/5</span>
+          </div>
+          <div class="row">
+            <button class="btn ghost" id="flip">Flip</button>
+            <button class="btn ghost" id="engineMove">Engine Move</button>
+            <button class="btn ghost" id="finish" style="border-color:rgba(235,87,87,.35)">Finish</button>
+          </div>
+        </div>
+        <div class="strip" style="margin-top:12px">
+          <div class="tile"><div class="mono pill" id="evalPill">eval: —</div></div>
+          <div class="tile"><div class="mono pill" id="depthPill">d: —</div></div>
+          <div class="tile"><div class="mono pill" id="npsPill">nps: —</div></div>
+        </div>
+        <div class="strip" style="margin-top:12px">
+          <div id="board"></div>
+        </div>
+        <div id="gameBanner" class="banner"></div>
+        <div class="label" style="margin-top:6px">Click <strong>New Game</strong> to start.</div>
+      </div>
+
+      <!-- Right: Status / clocks / controls / logs  -->
+      <div class="card pad">
+        <div class="row status">
+          <span id="spinner" class="spin" style="display:none"></span>
+          <span id="thinkingText">Idle</span>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <div class="clocks" style="width:100%">
+            <div class="clock"><div>White</div><strong class="mono" id="wClock">05:00</strong></div>
+            <div class="clock"><div>Black</div><strong class="mono" id="bClock">05:00</strong></div>
+          </div>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <label class="label">Move time (ms)</label>
+          <input id="ms" type="number" value="500" min="50" step="50">
+          <label class="label">Depth</label>
+          <input id="depth" type="number" min="1" step="1" placeholder="">
+        </div>
+        <div class="row" style="margin-top:14px">
+          <div class="tile" style="flex:1">
+            <div class="label">Moves (UCI)</div>
+            <div class="mono moves" id="movesSpan"></div>
+          </div>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <div class="tile" style="flex:1">
+            <div class="label">Log</div>
+            <pre id="log"></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Lower area for future feed/leaderboard etc. -->
+    <section class="lower" style="padding:12px 0 28px">
+      <div class="card pad">
+        <div class="label">Tips</div>
+        <div class="mono">Use "Flip" to switch perspective · Try different difficulty · Engine Move requests a reply on your turn.</div>
+      </div>
+      <aside class="card pad">
+        <div class="label">Shortcuts</div>
+        <div class="mono">N: New Game · F: Flip · E: Engine Move</div>
+      </aside>
+    </section>
+  </main>
+
+  <footer style="padding:24px 0 40px; color:var(--muted)">
+    <div class="container">© 2025 Ichigo · Privacy · Terms</div>
+  </footer>
+
+  <!-- ===== Your original JS (unaltered) ===== -->
   <script>
     // --- Piece glyphs & state ---
     const P = { w:{k:'\u2654',q:'\u2655',r:'\u2656',b:'\u2657',n:'\u2658',p:'\u2659'},
                 b:{k:'\u265A',q:'\u265B',r:'\u265C',b:'\u265D',n:'\u265E',p:'\u265F'} };
-    let boardArray = Array.from({length:8}, ()=>Array(8).fill(null)); // empty until New Game
+    let boardArray = Array.from({length:8}, ()=>Array(8).fill(null));
     let whiteAtBottom=true, selected=null, turn='w', moveList=[], started=false;
     let currentGameId = null;
-
-    // En-passant target: the square a pawn *could* capture on this ply
-    let epTarget = null;
+    let epTarget = null; // en passant target
 
     const boardDiv = document.getElementById('board');
     const playAsSel = document.getElementById('playAs');
     const diffRange = document.getElementById('difficulty');
     const diffLabel = document.getElementById('diffLabel');
     const msEl = document.getElementById('ms'), depthEl = document.getElementById('depth');
-    const spinner = document.getElementById('spinner'), thinkDot = document.getElementById('thinkingDot'), thinkText = document.getElementById('thinkingText');
+    const spinner = document.getElementById('spinner'), thinkText = document.getElementById('thinkingText');
     const evalPill = document.getElementById('evalPill'), depthPill = document.getElementById('depthPill'), npsPill = document.getElementById('npsPill');
     const wClock = document.getElementById('wClock'), bClock = document.getElementById('bClock');
-    const gameIdPill = document.getElementById('gameIdPill');
 
     let clocks = { w: 5*60*1000, b: 5*60*1000 }, clockTimer=null;
 
-    // --- Logging & status ---
     function log(s){ const el=document.getElementById('log'); el.textContent=s+"\n"+el.textContent; }
 
     function setThinking(on, stats){
       spinner.style.display = on ? 'inline-block' : 'none';
-      thinkDot.style.background = on ? '#6ea3ff' : '#ccc';
       thinkText.textContent = on ? 'Thinking…' : 'Idle';
       if (stats){
         depthPill.textContent = 'd: ' + (stats.depth ?? '—');
         npsPill.textContent   = 'nps: ' + (stats.nps ?? '—');
-        if (stats.evalMate != null) {
-          evalPill.textContent = 'eval: M' + stats.evalMate;
-        } else if (stats.evalCp != null) {
-          evalPill.textContent = 'eval: ' + (stats.evalCp/100).toFixed(2);
-        } else evalPill.textContent = 'eval: —';
+        if (stats.evalMate != null)      evalPill.textContent = 'eval: M' + stats.evalMate;
+        else if (stats.evalCp != null)   evalPill.textContent = 'eval: ' + (stats.evalCp/100).toFixed(2);
+        else                              evalPill.textContent = 'eval: —';
       } else {
-        depthPill.textContent = 'd: —';
-        npsPill.textContent = 'nps: —';
-        evalPill.textContent = 'eval: —';
+        depthPill.textContent = 'd: —'; npsPill.textContent = 'nps: —'; evalPill.textContent = 'eval: —';
       }
     }
 
     // --- Clocks ---
     function resetClocks(){ clocks={w:5*60*1000,b:5*60*1000}; updateClocks(); if (clockTimer) clearInterval(clockTimer); clockTimer=setInterval(tick,1000); }
-    function tick(){
-      clocks[turn]-=1000;
-      updateClocks();
-      if (clocks[turn] <= 0) {
-        const result = (turn === 'w') ? '0-1' : '1-0';
-        endGame({ result, reason: "timeout" });
-      }
-    }
+    function tick(){ clocks[turn]-=1000; updateClocks(); if (clocks[turn] <= 0) { const result = (turn==='w') ? '0-1' : '1-0'; endGame({ result, reason:'timeout' }); } }
     function updateClocks(){ wClock.textContent=fmt(clocks.w); bClock.textContent=fmt(clocks.b); }
     function fmt(ms){ ms=Math.max(ms,0); const s=Math.floor(ms/1000); const m=Math.floor(s/60); const r=s%60; return `${String(m).padStart(2,'0')}:${String(r).padStart(2,'0')}`; }
 
     // --- Rendering ---
-    function renderBoard() {
-      boardDiv.innerHTML = '';
-
-      const rRange = [...Array(8).keys()];
-      const cRange = [...Array(8).keys()];
-
-      rRange.forEach(r=>{
-        cRange.forEach(c=>{
-          const idxR = whiteAtBottom ? r : 7 - r;
-          const idxC = whiteAtBottom ? c : 7 - c;
-
+    function renderBoard(){
+      boardDiv.innerHTML='';
+      for(let r=0;r<8;r++){
+        for(let c=0;c<8;c++){
+          const idxR = whiteAtBottom ? r : 7-r;
+          const idxC = whiteAtBottom ? c : 7-c;
           const sq = document.createElement('div');
-          sq.className = 'sq ' + ((r+c)%2===0 ? 'light' : 'dark');
-
+          sq.className = 'sq ' + ((r+c)%2===0 ? 'light':'dark');
           const piece = boardArray[idxR][idxC];
-          if (piece) {
-            const span = document.createElement('span');
-            span.className = 'piece ' + (piece.c === 'w' ? 'w' : 'b');
-            span.textContent = P[piece.c][piece.t];
-            sq.appendChild(span);
-          }
-
-          sq.dataset.rc = idxR + ',' + idxC;
+          if (piece){ const span=document.createElement('span'); span.className='piece ' + (piece.c==='w'?'w':'b'); span.textContent=P[piece.c][piece.t]; sq.appendChild(span); }
+          sq.dataset.rc = idxR+','+idxC;
           if (selected && selected.r===idxR && selected.c===idxC) sq.classList.add('sel');
-
-          if (moveList.length){
-            const last = moveList[moveList.length-1];
-            const f = parseSq(last.slice(0,2)), t = parseSq(last.slice(2,4));
-            if ((f.r===idxR && f.c===idxC) || (t.r===idxR && t.c===idxC)) sq.classList.add('hl');
-          }
-
+          if (moveList.length){ const last=moveList[moveList.length-1]; const f=parseSq(last.slice(0,2)), t=parseSq(last.slice(2,4));
+            if ((f.r===idxR&&f.c===idxC) || (t.r===idxR&&t.c===idxC)) sq.classList.add('hl'); }
           sq.addEventListener('click', onSquareClick);
           boardDiv.appendChild(sq);
-        });
-      });
+        }
+      }
       document.getElementById('movesSpan').textContent = moveList.join(' ');
     }
 
-    // --- Setup ---
-    function startPosition() {
+    function startPosition(){
       const empty = () => Array(8).fill(null);
       const back = (c)=>[{c,t:'r'},{c,t:'n'},{c,t:'b'},{c,t:'q'},{c,t:'k'},{c,t:'b'},{c,t:'n'},{c,t:'r'}];
-      boardArray = [
-        back('b'),
-        Array(8).fill(null).map(()=>({c:'b',t:'p'})),
-        empty(), empty(), empty(), empty(),
-        Array(8).fill(null).map(()=>({c:'w',t:'p'})),
-        back('w')
-      ];
-      turn='w'; moveList=[]; selected=null; started=true; setThinking(false);
-      epTarget = null;
-      boardDiv.classList.remove('disabled');
-      resetClocks(); renderBoard();
+      boardArray = [ back('b'), Array(8).fill(null).map(()=>({c:'b',t:'p'})), empty(), empty(), empty(), empty(), Array(8).fill(null).map(()=>({c:'w',t:'p'})), back('w') ];
+      turn='w'; moveList=[]; selected=null; started=true; setThinking(false); epTarget=null; boardDiv.classList.remove('disabled'); resetClocks(); renderBoard();
     }
 
-    // --- Helpers & rules ---
     function parseSq(id){ const c=id.charCodeAt(0)-97; const r=8-parseInt(id[1],10); return {r,c}; }
     function rc2sq(x){ return 'abcdefgh'[x.c] + (8 - x.r); }
-    function promoSuffix(moving, to){
-      if (moving.t!=='p') return '';
-      if (moving.c==='w' && to.r===0) return 'q';
-      if (moving.c==='b' && to.r===7) return 'q';
-      return '';
+    function promoSuffix(moving, to){ if (moving.t!=='p') return ''; if (moving.c==='w' && to.r===0) return 'q'; if (moving.c==='b' && to.r===7) return 'q'; return ''; }
+
+    function updateEpTarget(moving, from, to){ epTarget=null; if (moving.t==='p' && from.c===to.c && Math.abs(to.r-from.r)===2){ epTarget={ r:(from.r+to.r)>>1, c:from.c }; } }
+
+    function handleSpecialMoves(moving, from, to){
+      // castling rook slide
+      if (moving.t==='k' && Math.abs(to.c-from.c)===2){ const row=from.r; if (to.c===6){ const rf={r:row,c:7}, rt={r:row,c:5}; if (boardArray[rf.r][rf.c]?.t==='r'){ boardArray[rt.r][rt.c]={...boardArray[rf.r][rf.c]}; boardArray[rf.r][rf.c]=null; } }
+        else if (to.c===2){ const rf={r:row,c:0}, rt={r:row,c:3}; if (boardArray[rf.r][rf.c]?.t==='r'){ boardArray[rt.r][rt.c]={...boardArray[rf.r][rf.c]}; boardArray[rf.r][rf.c]=null; } } }
+      // en passant capture (visualization guard)
+      if (moving.t==='p'){ const isDiag=from.c!==to.c; const targetEmpty=boardArray[to.r][to.c]==null; if (isDiag && targetEmpty && epTarget && epTarget.r===to.r && epTarget.c===to.c){ const cap={ r: moving.c==='w'? to.r+1 : to.r-1, c: to.c }; if (boardArray[cap.r]?.[cap.c]?.t==='p' && boardArray[cap.r][cap.c]?.c !== moving.c){ boardArray[cap.r][cap.c]=null; } } }
     }
 
-    function updateEpTarget(moving, from, to) {
-      // Set/clear EP square after a move is made.
-      epTarget = null;
-      if (moving.t === 'p' && from.c === to.c && Math.abs(to.r - from.r) === 2) {
-        epTarget = { r: (from.r + to.r) >> 1, c: from.c };
-      }
+    function endGame({ result='*', reason=null, pgn=null }={}){
+      if (clockTimer){ clearInterval(clockTimer); clockTimer=null; }
+      started=false; boardDiv.classList.add('disabled'); setThinking(false); document.getElementById('thinkingText').textContent='Game Over';
+      let title='Game Over'; if (reason==='checkmate') title='Checkmate'; else if (reason==='stalemate') title='Stalemate'; else if (reason==='threefold repetition') title='Draw · Threefold'; else if (reason==='insufficient material') title='Draw · Insufficient Material'; else if (reason==='draw') title='Draw'; else if (reason==='timeout') title='Time';
+      const esc=s=>s.replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
+      const displayPGN=(pgn||"").split("\n").filter(l=>!l.trim().startsWith("[")).join("\n").replace(/\n{3,}/g,"\n\n").trim();
+      const banner=document.getElementById('gameBanner');
+      banner.innerHTML=`<div class="row"><span>${title}</span><span class="meta">Result: ${result}</span>${pgn?`<button class="btn ghost" id="dlPgn">Download PGN</button>`:''}</div>${displayPGN?`<pre class="mono" style="margin-top:8px">${esc(displayPGN)}</pre>`:''}`;
+      banner.style.display='block';
+      if (pgn){ const btn=document.getElementById('dlPgn'); btn.onclick=()=>{ const blob=new Blob([pgn],{type:'text/plain;charset=utf-8'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='game.pgn'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); } }
+      log(`[game over] result=${result}${reason?" ("+reason+")":""}`);
     }
 
-    function handleSpecialMoves(moving, from, to) {
-      // --- Castling: king moved two files ---
-      if (moving.t === 'k' && Math.abs(to.c - from.c) === 2) {
-        const row = from.r;
-        if (to.c === 6) {
-          // king-side: rook h -> f
-          const rookFrom = { r: row, c: 7 };
-          const rookTo   = { r: row, c: 5 };
-          if (boardArray[rookFrom.r][rookFrom.c]?.t === 'r') {
-            boardArray[rookTo.r][rookTo.c] = { ...boardArray[rookFrom.r][rookFrom.c] };
-            boardArray[rookFrom.r][rookFrom.c] = null;
-          }
-        } else if (to.c === 2) {
-          // queen-side: rook a -> d
-          const rookFrom = { r: row, c: 0 };
-          const rookTo   = { r: row, c: 3 };
-          if (boardArray[rookFrom.r][rookFrom.c]?.t === 'r') {
-            boardArray[rookTo.r][rookTo.c] = { ...boardArray[rookFrom.r][rookFrom.c] };
-            boardArray[rookFrom.r][rookFrom.c] = null;
-          }
-        }
-      }
-
-      // --- En passant visualization guard: only if landing equals epTarget ---
-      if (moving.t === 'p') {
-        const isDiagonal = from.c !== to.c;
-        const targetEmpty = boardArray[to.r][to.c] == null;
-        if (isDiagonal && targetEmpty && epTarget && epTarget.r === to.r && epTarget.c === to.c) {
-          const cap = { r: moving.c === 'w' ? to.r + 1 : to.r - 1, c: to.c };
-          if (boardArray[cap.r]?.[cap.c]?.t === 'p' && boardArray[cap.r][cap.c]?.c !== moving.c) {
-            boardArray[cap.r][cap.c] = null;
-          }
-        }
-      }
-    }
-
-    function endGame({ result="*", reason=null, pgn=null } = {}) {
-      // stop clocks and freeze interactions
-      if (clockTimer) { clearInterval(clockTimer); clockTimer = null; }
-      started = false;
-      boardDiv.classList.add('disabled');
-
-      // status pills
-      setThinking(false);
-      document.getElementById('thinkingText').textContent = 'Game Over';
-
-      // build human-readable label
-      let title = "Game Over";
-      if (reason === "checkmate") title = "Checkmate";
-      else if (reason === "stalemate") title = "Stalemate";
-      else if (reason === "threefold repetition") title = "Draw · Threefold";
-      else if (reason === "insufficient material") title = "Draw · Insufficient Material";
-      else if (reason === "draw") title = "Draw";
-      else if (reason === "timeout") title = "Time";
-
-      // --- PGN: strip headers for display, keep full for download ---
-      const esc = s => s.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
-      const displayPGN = (pgn || "")
-        .split("\n")
-        .filter(line => !line.trim().startsWith("["))   // remove [Tag "..."] lines
-        .join("\n")
-        .replace(/\n{3,}/g, "\n\n")                     // collapse extra blank lines
-        .trim();
-
-      // render banner
-      const banner = document.getElementById("gameBanner");
-      banner.innerHTML = `
-        <div class="row">
-          <span>${title}</span>
-          <span class="meta">Result: ${result}</span>
-          ${pgn ? `<button class="btn" id="dlPgn">Download PGN</button>` : ``}
-        </div>
-        ${displayPGN ? `<pre style="margin-top:8px" class="mono">${esc(displayPGN)}</pre>` : ``}
-      `;
-      banner.style.display = "block";
-
-      // optional PGN download button (keeps full PGN with headers)
-      if (pgn) {
-        const btn = document.getElementById("dlPgn");
-        btn.onclick = () => {
-          const blob = new Blob([pgn], { type: "text/plain;charset=utf-8" });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url; a.download = "game.pgn";
-          document.body.appendChild(a); a.click();
-          a.remove(); URL.revokeObjectURL(url);
-        };
-      }
-
-      // log too
-      log(`[game over] result=${result}${reason ? " ("+reason+")" : ""}`);
-    }
-
-    // --- Click handler with robust revert ---
     async function onSquareClick(e){
-      if (!started) { log('Click "New Game" to start.'); return; }
-      if (playAsSel.value !== turn && !selected) { return; }
-
+      if (!started){ log('Click "New Game" to start.'); return; }
+      if (playAsSel.value !== turn && !selected) return;
       const [r,c] = e.currentTarget.dataset.rc.split(',').map(Number);
       const piece = boardArray[r][c];
-
-      if (!selected) {
-        if (!piece || piece.c !== turn) return;
-        selected = {r,c}; renderBoard(); return;
-      }
-      if (selected.r===r && selected.c===c) { selected=null; renderBoard(); return; }
-
-      const from = selected, to = {r,c};
-      const target = boardArray[to.r][to.c];
-      const moving = boardArray[from.r][from.c];
-      if (target && target.c === moving.c) { selected = {r,c}; renderBoard(); return; }
-
-      const uci = rc2sq(from) + rc2sq(to) + promoSuffix(moving, to);
-
-      // --- SNAPSHOT for safe revert (covers EP/castling/promotions) ---
-      const prevBoard = boardArray.map(row => row.map(cell => cell ? {...cell} : null));
-      const prevTurn  = turn;
-      const prevMoves = moveList.slice();
-      const prevSelected = selected ? {...selected} : null;
-      const prevEpTarget = epTarget ? {...epTarget} : null;
-
-      // optimistic UI move
-      boardArray[to.r][to.c] = { ...moving };
-      boardArray[from.r][from.c] = null;
-
-      // promotion
-      const promo = uci[4];
-      if (promo) boardArray[to.r][to.c].t = promo;
-
-      // special moves (castle rook slide, EP capture)
-      handleSpecialMoves(moving, from, to);
-
-      moveList.push(uci);
-      selected = null;
-      turn = (turn==='w'?'b':'w');
-
-      // update EP target for next ply
-      updateEpTarget(moving, from, to);
-
-      renderBoard();
-
-      // Persist human move — server validates. Revert on failure.
-      if (currentGameId) {
-        try {
-          const r = await fetch(`/game/${currentGameId}/move`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ uci })
-          });
-
-          if (!r.ok) {
-            const err = await r.json().catch(() => ({}));
-            // --- FULL REVERT ---
-            boardArray = prevBoard;
-            turn = prevTurn;
-            moveList = prevMoves;
-            selected = prevSelected;
-            epTarget = prevEpTarget;
-            renderBoard();
-            log(`[illegal] ${uci} (${err.error || r.status})`);
-            return;
-          }
-
-          const jr = await r.json();
-          if (jr.over) {
-            endGame({ result: jr.result, reason: jr.reason, pgn: jr.pgn });
-            return;
-          }
-        } catch (e) {
-          // network error: also revert
-          boardArray = prevBoard;
-          turn = prevTurn;
-          moveList = prevMoves;
-          selected = prevSelected;
-          epTarget = prevEpTarget;
-          renderBoard();
-          log(`[error] move not saved: ${e?.message || e}`);
-          return;
-        }
-      }
-
-      // If it's now the engine's turn (you moved as playAs), ask engine
+      if (!selected){ if (!piece || piece.c!==turn) return; selected={r,c}; renderBoard(); return; }
+      if (selected.r===r && selected.c===c){ selected=null; renderBoard(); return; }
+      const from=selected, to={r,c}; const target=boardArray[to.r][to.c]; const moving=boardArray[from.r][from.c];
+      if (target && target.c===moving.c){ selected={r,c}; renderBoard(); return; }
+      const uci = rc2sq(from)+rc2sq(to)+promoSuffix(moving,to);
+      const prevBoard = boardArray.map(row=>row.map(cell=>cell?{...cell}:null));
+      const prevTurn=turn, prevMoves=moveList.slice(), prevSelected=selected?{...selected}:null, prevEpTarget=epTarget?{...epTarget}:null;
+      boardArray[to.r][to.c] = { ...moving }; boardArray[from.r][from.c] = null; const promo=uci[4]; if (promo) boardArray[to.r][to.c].t=promo; handleSpecialMoves(moving,from,to);
+      moveList.push(uci); selected=null; turn=(turn==='w'?'b':'w'); updateEpTarget(moving,from,to); renderBoard();
+      if (currentGameId){ try{ const r=await fetch(`/game/${currentGameId}/move`,{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ uci }) }); if (!r.ok){ const err=await r.json().catch(()=>({})); boardArray=prevBoard; turn=prevTurn; moveList=prevMoves; selected=prevSelected; epTarget=prevEpTarget; renderBoard(); log(`[illegal] ${uci} (${err.error||r.status})`); return;} const jr=await r.json(); if (jr.over){ endGame({ result:jr.result, reason:jr.reason, pgn:jr.pgn }); return; } } catch(e){ boardArray=prevBoard; turn=prevTurn; moveList=prevMoves; selected=prevSelected; epTarget=prevEpTarget; renderBoard(); log(`[error] move not saved: ${e?.message||e}`); return; } }
       if (playAsSel.value !== turn) engineMove();
     }
 
-    // --- Engine move application & persistence ---
-    async function applyEngineBestmove(uci) {
-      if (!uci || uci.length < 4) return;
-
-      const from = parseSq(uci.slice(0, 2));
-      const to   = parseSq(uci.slice(2, 4));
-      const promo = uci[4] || null;
-
-      const moving = boardArray[from.r]?.[from.c];
-      if (!moving) {
-        log(`[engine] ignored move: ${uci} (no piece at source)`);
-        return;
-      }
-
-      const moved = { ...moving };
-      if (promo) moved.t = promo;
-
-      boardArray[to.r][to.c] = moved;
-      boardArray[from.r][from.c] = null;
-
-      handleSpecialMoves(moving, from, to);
-
-      moveList.push(uci);
-      turn = (turn === 'w' ? 'b' : 'w');
-
-      // update EP target based on the engine's *last* move
-      updateEpTarget(moving, from, to);
-
-      renderBoard();
-      log(`[engine] ${uci}`);
-
-      if (currentGameId) {
-        try {
-          const r = await fetch(`/game/${currentGameId}/move`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ uci })
-          });
-
-          if (!r.ok) {
-            const err = await r.json().catch(() => ({}));
-            log(`[engine persist error] ${uci} (${err.error || r.status})`);
-            return;
-          }
-
-          const jr = await r.json();
-          if (jr.over) {
-            endGame({ result: jr.result, reason: jr.reason, pgn: jr.pgn });
-            return;
-          }
-        } catch (e) {
-          log(`[engine persist error] ${e?.message || e}`);
-        }
-      }
+    async function applyEngineBestmove(uci){ if (!uci||uci.length<4) return; const from=parseSq(uci.slice(0,2)); const to=parseSq(uci.slice(2,4)); const promo=uci[4]||null; const moving=boardArray[from.r]?.[from.c]; if (!moving){ log(`[engine] ignored move: ${uci} (no piece at source)`); return; } const moved={...moving}; if (promo) moved.t=promo; boardArray[to.r][to.c]=moved; boardArray[from.r][from.c]=null; handleSpecialMoves(moving,from,to); moveList.push(uci); turn=(turn==='w'?'b':'w'); updateEpTarget(moving,from,to); renderBoard(); log(`[engine] ${uci}`);
+      if (currentGameId){ try{ const r=await fetch(`/game/${currentGameId}/move`,{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ uci }) }); if (!r.ok){ const err=await r.json().catch(()=>({})); log(`[engine persist error] ${uci} (${err.error||r.status})`); return; } const jr=await r.json(); if (jr.over){ endGame({ result:jr.result, reason:jr.reason, pgn:jr.pgn }); return; } } catch(e){ log(`[engine persist error] ${e?.message||e}`); } }
     }
 
-    async function engineMove(){
-      if (!started) return;
-      setThinking(true);
-      try {
-        // Opening book try
-        try {
-          const br = await fetch("/bookmove", {
-            method:"POST",
-            headers:{ "Content-Type":"application/json" },
-            body: JSON.stringify({ moves: moveList })
-          });
-          const b = await br.json();
-          if (b.bookmove) {
-            setThinking(false);
-            applyEngineBestmove(b.bookmove);
-            log(`[book] ${b.bookmove}`);
-            return;
-          }
-        } catch(_) {}
-
-        // Depth or movetime via difficulty
-        const depth = depthEl.value ? Number(depthEl.value) : null;
-        const diff  = Number(diffRange.value || 2);
-        const diffMs = [250, 500, 1000, 2000, 4000][diff - 1];
-        const movetimeMs = depth ? Number(msEl.value || 500) : diffMs;
-
-        const payload = {
-          moves: moveList,
-          movetimeMs,
-          depth: depth || null,
-          wtime: clocks.w,
-          btime: clocks.b,
-          winc: 0,
-          binc: 0
-        };
-
-        const r = await fetch("/bestmove", {
-          method:"POST",
-          headers:{ "Content-Type":"application/json" },
-          body: JSON.stringify(payload)
-        });
-        const data = await r.json();
-        setThinking(false, data.stats);
-        if (data.bestmove) applyEngineBestmove(data.bestmove);
-        else log(`[engine error]\n${data.raw||''}`);
-      } catch(e){
-        setThinking(false);
-        log('Failed to call /bestmove: '+(e?.message||e));
-      }
+    async function engineMove(){ if (!started) return; setThinking(true); try{
+        try{ const br=await fetch('/bookmove',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ moves: moveList }) }); const b=await br.json(); if (b.bookmove){ setThinking(false); applyEngineBestmove(b.bookmove); log(`[book] ${b.bookmove}`); return; } } catch(_){ }
+        const depth = depthEl.value ? Number(depthEl.value) : null; const diff=Number(diffRange.value||2); const diffMs=[250,500,1000,2000,4000][diff-1]; const movetimeMs = depth ? Number(msEl.value||500) : diffMs;
+        const payload = { moves: moveList, movetimeMs, depth: depth||null, wtime: clocks.w, btime: clocks.b, winc:0, binc:0 };
+        const r=await fetch('/bestmove',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) }); const data=await r.json(); setThinking(false, data.stats); if (data.bestmove) applyEngineBestmove(data.bestmove); else log(`[engine error]\n${data.raw||''}`);
+      } catch(e){ setThinking(false); log('Failed to call /bestmove: '+(e?.message||e)); }
     }
 
-    // --- Controls ---
-    document.getElementById('new').onclick = async () => {
-      try {
-        const r = await fetch("/game/new", {
-          method:"POST",
-          headers:{ "Content-Type":"application/json" },
-          body: JSON.stringify({ time_control: "300+0" })
-        });
-        const g = await r.json();
-        currentGameId = g.gameId || null;
-        if (currentGameId) {
-          gameIdPill.textContent = `game #${currentGameId}`;
-          gameIdPill.style.display='inline-block';
-        } else {
-          gameIdPill.style.display='none';
-        }
-      } catch(_) { currentGameId = null; gameIdPill.style.display='none'; }
-      startPosition();
-
-      // Optional: auto-flip so your side is at bottom
-      whiteAtBottom = (playAsSel.value === 'w');
-      renderBoard();
-
-      // If you chose Black, engine makes the first move
-      if (playAsSel.value === 'b') engineMove();
-    };
-
-    document.getElementById('flip').onclick = () => { whiteAtBottom = !whiteAtBottom; renderBoard(); };
-    document.getElementById('engineMove').onclick = () => { if (started && playAsSel.value !== turn) engineMove(); };
-    document.getElementById('finish').onclick = async () => {
-      if (!currentGameId) { log("No active game id."); return; }
-      try {
-        const r = await fetch(`/game/${currentGameId}/finish`, {
-          method:"POST", headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ result: "*" })
-        });
-        const data = await r.json();
-        if (data.pgn) log("Saved PGN:\n" + data.pgn);
-      } catch (e) { log("Finish failed: "+(e?.message||e)); }
-    };
+    document.getElementById('new').onclick = async ()=>{ try{ const r=await fetch('/game/new',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ time_control:'300+0' }) }); const g=await r.json(); currentGameId=g.gameId||null; } catch(_){ currentGameId=null; } startPosition(); whiteAtBottom=(playAsSel.value==='w'); renderBoard(); if (playAsSel.value==='b') engineMove(); };
+    document.getElementById('flip').onclick = ()=>{ whiteAtBottom=!whiteAtBottom; renderBoard(); };
+    document.getElementById('engineMove').onclick = ()=>{ if (started && playAsSel.value !== turn) engineMove(); };
+    document.getElementById('finish').onclick = async ()=>{ if (!currentGameId){ log('No active game id.'); return; } try{ const r=await fetch(`/game/${currentGameId}/finish`,{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ result:'*' }) }); const data=await r.json(); if (data.pgn) log('Saved PGN:\n'+data.pgn); } catch(e){ log('Finish failed: '+(e?.message||e)); } };
     diffRange.addEventListener('input', ()=>{ diffLabel.textContent = `${diffRange.value}/5`; });
 
-    // Initial render (empty board UI)
+    // initial empty render
     renderBoard();
+
+    // minimal shortcuts
+    window.addEventListener('keydown', (e)=>{
+      if (e.key==='n' || e.key==='N') document.getElementById('new').click();
+      if (e.key==='f' || e.key==='F') document.getElementById('flip').click();
+      if (e.key==='e' || e.key==='E') document.getElementById('engineMove').click();
+    });
   </script>
 </body>
 </html>
