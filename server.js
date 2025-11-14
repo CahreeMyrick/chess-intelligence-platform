@@ -4,7 +4,12 @@ const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const rateLimit = require("express-rate-limit");
-const { Chess } = require("chess.js");
+
+
+const chessjs = require("chess.js");
+// Works with both old and new chess.js builds
+const Chess = typeof chessjs === "function" ? chessjs : chessjs.Chess;
+
 let BOOK = {};
 try { BOOK = require("./book"); } catch { BOOK = {}; } // optional book
 const Database = require("better-sqlite3");
@@ -15,9 +20,11 @@ const PORT = Number(process.env.PORT || 8080);
 const HOST = "0.0.0.0";
 const DEFAULT_SITE = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
 // const ENGINE_PATH = path.join(__dirname, "engine", "chess_engine");
-const ENGINE_PATH = process.env.ENGINE_PATH || "/app/engine/chess_uci_bb";
+const ENGINE_PATH = process.env.ENGINE_PATH || path.join(__dirname, "build", "chess_uci_bb");
+
 //const ENGINE_PATH = process.env.ENGINE_PATH || ""
-const DATA_DIR = process.env.DATA_DIR || "/app/data";
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
+
 
 // ensure data dir exists
 fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -603,6 +610,204 @@ app.get("/game/:id.pgn", (req, res) => {
   });
   res.type("text/plain").send(pgn);
 });
+
+
+function loadPgnCompat(game, pgn) {
+  const text = String(pgn || "");
+
+  // Newer chess.js / chess.ts
+  if (typeof game.loadPgn === "function") {
+    try {
+      game.loadPgn(text, { sloppy: true });
+      return true; // success
+    } catch (e) {
+      console.error("loadPgn error:", e);
+      return false;
+    }
+  }
+
+  // Older chess.js
+  if (typeof game.load_pgn === "function") {
+    try {
+      return game.load_pgn(text, { sloppy: true });
+    } catch (e) {
+      console.error("load_pgn error:", e);
+      return false;
+    }
+  }
+
+  throw new Error("Chess.js instance has no loadPgn/load_pgn method");
+}
+
+async function fetchJsonWithTimeout(url, { timeoutMs = 5000 } = {}) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(url, {
+      headers: {
+        "User-Agent": "Ichigo/1.0 (+your-email-or-site)",
+        "Accept": "application/json",
+      },
+      signal: ctrl.signal,
+    });
+    if (!r.ok) {
+      const err = new Error(`HTTP ${r.status} for ${url}`);
+      err.status = r.status;
+      throw err;
+    }
+    return await r.json();
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+// === Chess.com recent month games ===
+async function getRecentMonthGames(usernameRaw) {
+  const username = String(usernameRaw || "").trim().toLowerCase();
+  if (!username) throw new Error("missing username");
+
+  const base = `https://api.chess.com/pub/player/${encodeURIComponent(username)}`;
+
+  // 1) archives list
+  const archivesJson = await fetchJsonWithTimeout(`${base}/games/archives`);
+  const archives = Array.isArray(archivesJson.archives) ? archivesJson.archives : [];
+  if (!archives.length) {
+    return { username, archive: null, games: [] };
+  }
+
+  // 2) most recent month
+  const latestUrl = archives[archives.length - 1];
+
+  // 3) that month’s games
+  const monthJson = await fetchJsonWithTimeout(latestUrl);
+  const rawGames = Array.isArray(monthJson.games) ? monthJson.games : [];
+
+  const games = rawGames.map((g, idx) => ({
+    id: idx,
+    url: g.url || null,
+    end_time: g.end_time || null,
+    time_control: g.time_control || null,
+    time_class: g.time_class || null,
+    rated: !!g.rated,
+    white: {
+      username: g.white?.username || null,
+      rating: g.white?.rating || null,
+      result: g.white?.result || null,
+    },
+    black: {
+      username: g.black?.username || null,
+      rating: g.black?.rating || null,
+      result: g.black?.result || null,
+    },
+    pgn: g.pgn || null,
+  }));
+
+  return { username, archive: latestUrl, games };
+}
+
+// HTTP endpoint: recent games
+app.get("/chesscom/:username/games/recent", async (req, res) => {
+  try {
+    const data = await getRecentMonthGames(req.params.username);
+    res.json(data);
+  } catch (e) {
+    console.error("[/chesscom/:username/games/recent]", e);
+    if (e.status === 404) {
+      return res.status(404).json({ error: "user not found on chess.com" });
+    }
+    res.status(502).json({ error: "failed to load games from chess.com" });
+  }
+});
+
+function buildPuzzlesFromPGN({ pgn, username, maxPuzzles = 12 }) {
+  const game = new Chess();
+
+  const ok = loadPgnCompat(game, pgn);
+  if (!ok) throw new Error("bad PGN");
+
+  let tags = {};
+  if (typeof game.header === "function") {
+    try { tags = game.header() || {}; } catch { tags = {}; }
+  } else if (typeof game.getHeaders === "function") {
+    try { tags = game.getHeaders() || {}; } catch { tags = {}; }
+  }
+
+  const uname = username ? String(username).toLowerCase() : null;
+
+  let focusColor = "w";
+  if (uname) {
+    if ((tags.White || "").toLowerCase() === uname) focusColor = "w";
+    else if ((tags.Black || "").toLowerCase() === uname) focusColor = "b";
+  }
+
+  const verboseMoves = game.history({ verbose: true });
+  const replay = new Chess();
+
+  const puzzles = [];
+
+  for (let i = 0; i < verboseMoves.length; i++) {
+    const moveObj = verboseMoves[i];
+    const sideToMove = replay.turn();
+    const fenBefore = replay.fen();
+
+    if (sideToMove === focusColor) {
+      const uci =
+        moveObj.from +
+        moveObj.to +
+        (moveObj.promotion ? moveObj.promotion : "");
+
+      const fullMoveNumber = Math.floor(i / 2) + 1;
+
+      puzzles.push({
+        id: i,
+        fen: fenBefore,
+        sideToMove,
+        uci,
+        san: moveObj.san,
+        ply: i + 1,
+        moveNumber: fullMoveNumber,
+      });
+    }
+
+    replay.move(moveObj);
+  }
+
+  if (puzzles.length > maxPuzzles) {
+    const step = Math.max(1, Math.floor(puzzles.length / maxPuzzles));
+    const sampled = [];
+    for (let i = 0; i < puzzles.length && sampled.length < maxPuzzles; i += step) {
+      sampled.push(puzzles[i]);
+    }
+    return sampled;
+  }
+
+  return puzzles;
+}
+
+// HTTP endpoint: build puzzles from a single game PGN
+app.post("/puzzles/from-game", (req, res) => {
+  try {
+    const { pgn, username, maxPuzzles } = req.body || {};
+    if (!pgn) return res.status(400).json({ error: "missing pgn" });
+
+    const max = Number.isFinite(Number(maxPuzzles))
+      ? Math.min(Math.max(Number(maxPuzzles), 1), 50)
+      : 12;
+
+    const puzzles = buildPuzzlesFromPGN({ pgn, username, maxPuzzles: max });
+
+    res.json({
+      ok: true,
+      count: puzzles.length,
+      puzzles,
+    });
+  } catch (e) {
+    console.error("[/puzzles/from-game] error:", e);
+    res.status(500).json({ ok: false, error: "puzzle generation failed" });
+  }
+});
+
+
 
 // Root fallback (serves index if no static file matched)
 app.get("/", (req, res) => {

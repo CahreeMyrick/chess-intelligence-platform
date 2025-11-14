@@ -13,30 +13,82 @@
     @media (max-width:600px){ :root{ --square:44px } }
     *{box-sizing:border-box}
     html,body{height:100%}
-    body{margin:0; font:16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Helvetica, Arial; color:var(--text); background:linear-gradient(180deg,#0d130f 0%, #0b100c 100%)}
+    body{
+      margin:0;
+      font:16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Helvetica, Arial;
+      color:var(--text);
+      background:linear-gradient(180deg,#0d130f 0%, #0b100c 100%);
+    }
     a{color:inherit; text-decoration:none}
     .container{max-width:1100px; margin:0 auto; padding:0 16px}
 
-    .topbar{position:sticky; top:0; z-index:50; backdrop-filter:saturate(120%) blur(6px); background:rgba(15,20,16,.8); border-bottom:1px solid rgba(123,199,105,.12)}
+    .topbar{
+      position:sticky; top:0; z-index:50;
+      backdrop-filter:saturate(120%) blur(6px);
+      background:rgba(15,20,16,.8);
+      border-bottom:1px solid rgba(123,199,105,.12)
+    }
     .nav{display:flex; align-items:center; justify-content:space-between; height:64px}
     .brand{display:flex; align-items:center; gap:10px; font-weight:800}
-    .logo{width:28px; height:28px; display:grid; place-items:center; border-radius:8px; background:radial-gradient(70% 70% at 30% 30%, var(--accent-2), var(--accent)); box-shadow:0 3px 12px rgba(123,199,105,.35)}
+    .logo{
+      width:28px; height:28px; display:grid; place-items:center; border-radius:8px;
+      background:radial-gradient(70% 70% at 30% 30%, var(--accent-2), var(--accent));
+      box-shadow:0 3px 12px rgba(123,199,105,.35)
+    }
     .nav-links{display:flex; gap:18px; align-items:center}
     .nav-links a{padding:8px 10px; border-radius:10px; color:var(--muted)}
     .nav-links a.active, .nav-links a:hover{background:var(--surface-2); color:var(--text)}
     .actions{display:flex; gap:12px}
-    .btn{padding:8px 12px; border-radius:12px; display:inline-flex; align-items:center; gap:8px; font-weight:600; border:1px solid transparent; cursor:pointer}
-    .btn.ghost{background:transparent; color:var(--text); border-color:rgba(123,199,105,.25)}
-    .btn.primary{background:linear-gradient(180deg,var(--accent-2),var(--accent)); color:#0a120a; box-shadow:0 8px 20px rgba(91,160,78,.35)}
+    .btn{
+      padding:8px 12px; border-radius:12px;
+      display:inline-flex; align-items:center; gap:8px;
+      font-weight:600; border:1px solid transparent; cursor:pointer;
+      background:transparent; color:var(--text);
+    }
+    .btn.ghost{border-color:rgba(123,199,105,.25)}
+    .btn.primary{
+      background:linear-gradient(180deg,var(--accent-2),var(--accent));
+      color:#0a120a;
+      box-shadow:0 8px 20px rgba(91,160,78,.35)
+    }
     .btn.primary:hover{filter:saturate(105%)} .btn.ghost:hover{background:var(--surface-2)}
 
-    .card{background:var(--surface); border:1px solid rgba(123,199,105,.10); border-radius:var(--radius); box-shadow:var(--shadow)}
+    .card{
+      background:var(--surface);
+      border:1px solid rgba(123,199,105,.10);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow)
+    }
     .pad{padding:16px}
     .grid{display:grid; grid-template-columns:1.1fr .9fr; gap:20px}
-    @media (max-width:1000px){ .grid{grid-template-columns:1fr} .nav-links{display:none} }
+    @media (max-width:1000px){
+      .grid{grid-template-columns:1fr}
+      .nav-links{display:none}
+    }
 
-    #board{ display:grid; grid-template-columns:repeat(8, var(--square)); grid-template-rows:repeat(8, var(--square)); border:1px solid rgba(123,199,105,.15); border-radius:14px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,.35) }
-    .sq{ display:flex; align-items:center; justify-content:center; font-size:38px; user-select:none; cursor:pointer; position:relative }
+    #board{
+      display:grid;
+      grid-template-columns:repeat(8, var(--square));
+      grid-template-rows:repeat(8, var(--square));
+      border:1px solid rgba(123,199,105,.15);
+      border-radius:14px;
+      overflow:hidden;
+      box-shadow:0 10px 30px rgba(0,0,0,.35);
+      margin:0 auto; 
+    }
+    .board-shell{
+      display:flex;
+      justify-content:center;
+    }
+
+    #board{
+      flex-shrink:0; /* keep exact 8×8 size, don’t stretch or squish */
+    }
+
+    .sq{
+      display:flex; align-items:center; justify-content:center;
+      font-size:38px; user-select:none; cursor:pointer; position:relative
+    }
     .light{ background:var(--light) } .dark{ background:var(--dark) }
     .sel{ outline:3px solid var(--accent); outline-offset:-3px }
     .hl::after{ content:""; position:absolute; inset:0; background:rgba(123,199,105,.22) }
@@ -44,33 +96,72 @@
     .piece.w{ color:#ffffff } .piece.b{ color:#111111 }
 
     .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
-    .pill{ padding:2px 8px; border-radius:999px; background:var(--surface-2); border:1px solid rgba(123,199,105,.22) }
+    .pill{
+      padding:2px 8px;
+      border-radius:999px;
+      background:var(--surface-2);
+      border:1px solid rgba(123,199,105,.22)
+    }
     .muted{color:var(--muted)}
-    .list{display:flex; flex-direction:column; gap:10px}
-    .chip{display:inline-block; padding:6px 10px; border-radius:999px; background:var(--surface-2); border:1px solid rgba(123,199,105,.14); color:var(--muted)}
+    .list{display:flex; flex-direction:column; gap:8px}
+    .chip{
+      display:inline-block;
+      padding:6px 10px;
+      border-radius:999px;
+      background:var(--surface-2);
+      border:1px solid rgba(123,199,105,.14);
+      color:var(--muted)
+    }
     .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace}
-    .alert{margin-top:10px; padding:10px 12px; border:1px solid rgba(235,87,87,.35); background:#3b2323; color:#ffdede; border-radius:12px; display:none}
+    .alert{
+      margin-top:10px; padding:10px 12px;
+      border:1px solid rgba(235,87,87,.35);
+      background:#3b2323; color:#ffdede;
+      border-radius:12px; display:none
+    }
+
+    /* New: input styling for username */
+    input[type="text"]{
+      background:#0f1512;
+      color:var(--text);
+      border:1px solid rgba(123,199,105,.25);
+      border-radius:10px;
+      padding:7px 9px;
+      font:inherit;
+      flex:1;
+      min-width:0;
+    }
+
+    /* New: game list container */
+    #gamesList button{
+      width:100%;
+      justify-content:space-between;
+      padding:6px 8px;
+      font-size:0.85rem;
+      margin-bottom:6px;
+    }
   </style>
 </head>
 <body>
   <header class="topbar">
     <div class="container nav">
-      <div class="brand"><div class="logo">♟</div><a href="/" style="font-weight:800">Ichigo</a></div>
+      <div class="brand">
+        <div class="logo">♟</div>
+        <a href="/" style="font-weight:800">Ichigo</a>
+      </div>
       <nav class="nav-links">
         <a href="/">Play</a>
         <a href="/puzzles.html" class="active">Puzzles</a>
-        
-        <!--<a href="#">Learn</a>
-        <a href="#">Watch</a>-->
       </nav>
       <div class="actions">
-        <!--<a class="btn ghost" href="/games.html">My Games</a>-->
+        <!-- reserved for future actions -->
       </div>
     </div>
   </header>
 
   <main class="container" style="padding:20px 0 28px">
     <section class="grid">
+      <!-- ===== LEFT: Puzzle board ===== -->
       <div class="card pad">
         <div class="row" style="justify-content:space-between; margin-bottom:10px">
           <div class="row">
@@ -90,7 +181,10 @@
           </div>
         </div>
 
-        <div id="board"></div>
+        <div class="board-shell">
+          <div id="board"></div>
+        </div>
+        
 
         <div class="row" style="margin-top:12px; justify-content:space-between">
           <div class="row">
@@ -98,27 +192,51 @@
             <div class="chip mono" id="progress">0 / 0</div>
           </div>
           <div class="row">
+            <!-- New: navigate between puzzles from the same game -->
+            <button class="btn ghost" id="btnPrevPuzzle" title="Previous puzzle">◀</button>
+            <button class="btn ghost" id="btnNextPuzzle" title="Next puzzle">▶</button>
             <button class="btn ghost" id="btnStep">Step</button>
             <button class="btn ghost" id="btnAuto">Auto</button>
           </div>
         </div>
 
         <div id="alert" class="alert">Incorrect. Try again.</div>
-        <div style="margin-top:12px" class="muted">Solution (UCI): <span class="mono" id="solutionRaw">—</span></div>
+        <div style="margin-top:12px" class="muted">
+          Solution (UCI): <span class="mono" id="solutionRaw">—</span>
+        </div>
       </div>
 
+      <!-- ===== RIGHT: From your games + instructions ===== -->
       <aside class="card pad">
-        <div class="row" style="justify-content:space-between">
-          <div class="muted">Instructions</div>
+        <div class="row" style="justify-content:space-between; margin-bottom:8px">
+          <div class="muted">From your Chess.com games</div>
+          <span class="pill mono" id="gamesStatus">Idle</span>
         </div>
         <div class="list">
-          <div class="muted">• Click the correct move sequence to solve the puzzle. If you miss, you can immediately try again.</div>
-          <div class="muted">• The board orients by side-to-move by default; switch to “white bottom” or click Flip as needed.</div>
-          <div class="muted">• “Step” plays the next move in the official solution; “Auto” plays the rest.</div>
+          <div class="row">
+            <input id="usernameInput" type="text" placeholder="Chess.com username" autocomplete="off" />
+            <button class="btn primary" id="btnLoadGames">Load</button>
+          </div>
+          <div class="muted" style="font-size:0.9rem;">
+            We’ll fetch your most recent month of games and turn them into quick one-move tactics.
+          </div>
+          <div id="gamesList" class="list" style="max-height:260px; overflow:auto; margin-top:6px;"></div>
+
+          <hr style="border:none; border-top:1px solid rgba(123,199,105,.18); margin:10px 0;">
+
+          <div class="muted">Instructions</div>
+          <div class="list">
+            <div class="muted">• Click a game above to generate several puzzles from that game. Use ◀ / ▶ to move between them.</div>
+            <div class="muted">• Daily / Random use live puzzles from Chess.com’s API.</div>
+            <div class="muted">• Click the correct move sequence to solve the puzzle. If you miss, you can immediately try again.</div>
+            <div class="muted">• The board orients by side-to-move by default; switch to “white bottom” or click Flip as needed.</div>
+            <div class="muted">• “Step” plays the next move in the official solution; “Auto” plays the rest.</div>
+          </div>
         </div>
       </aside>
     </section>
   </main>
+
   <script>
     // --- Unicode piece map ---
     const P = { w:{k:'\u2654',q:'\u2655',r:'\u2656',b:'\u2657',n:'\u2658',p:'\u2659'},
@@ -134,18 +252,32 @@
     const solRawEl   = document.getElementById('solutionRaw');
     const labTurnEl  = document.getElementById('labTurn');
     const viewModeEl = document.getElementById('viewMode');
+
+    // NEW: username + games UI
+    const usernameInput  = document.getElementById('usernameInput');
+    const btnLoadGames   = document.getElementById('btnLoadGames');
+    const gamesListEl    = document.getElementById('gamesList');
+    const gamesStatusEl  = document.getElementById('gamesStatus');
+    const btnPrevPuzzle  = document.getElementById('btnPrevPuzzle');
+    const btnNextPuzzle  = document.getElementById('btnNextPuzzle');
   
     // --- State ---
     let boardArray = Array.from({length:8}, ()=>Array(8).fill(null));
     let selected   = null;
     let solution   = [];
-    let idx        = 0;
+    let idx        = 0;     // index into solution[]
     let startFen   = null;
     let turn       = 'w';     // updated every applied move
     let initSide   = 'w';     // side to move from FEN
     let viewMode   = 'side';  // 'side' | 'white'
     let whiteAtBottom = true;
     let autoTimer  = null;
+
+    // NEW: puzzles coming from a single game
+    let fromGamePuzzles    = [];
+    let fromGameIndex      = -1;
+    let fromGameGame       = null;
+    let fromGameUsername   = null;
   
     // --- Helpers ---
     const files = 'abcdefgh';
@@ -247,10 +379,16 @@
         const row = from.r;
         if (to.c === 6){ // king side
           const rf = { r: row, c: 7 }, rt = { r: row, c: 5 };
-          if (boardArray[rf.r][rf.c]?.t === 'r'){ boardArray[rt.r][rt.c] = { ...boardArray[rf.r][rf.c] }; boardArray[rf.r][rf.c] = null; }
+          if (boardArray[rf.r][rf.c]?.t === 'r'){
+            boardArray[rt.r][rt.c] = { ...boardArray[rf.r][rf.c] };
+            boardArray[rf.r][rf.c] = null;
+          }
         } else if (to.c === 2){ // queen side
           const rf = { r: row, c: 0 }, rt = { r: row, c: 3 };
-          if (boardArray[rf.r][rf.c]?.t === 'r'){ boardArray[rt.r][rt.c] = { ...boardArray[rf.r][rf.c] }; boardArray[rf.r][rf.c] = null; }
+          if (boardArray[rf.r][rf.c]?.t === 'r'){
+            boardArray[rt.r][rt.c] = { ...boardArray[rf.r][rf.c] };
+            boardArray[rf.r][rf.c] = null;
+          }
         }
       }
   
@@ -336,8 +474,6 @@
   
     // --- Verification (find first inconsistent move offline) ---
     function verifySolutionOnce(fen, moves){
-      // Clone state and replay; return null if all good, else error string
-      // Parse FEN into temp board
       const parts = fen.trim().split(/\s+/);
       const piecePlacement = parts[0];
       const startTurn = (parts[1] || 'w');
@@ -366,7 +502,6 @@
         const dest = tempBoard[to.r]?.[to.c] || null;
         if (dest && dest.c === moving.c) return 'destination has own piece';
   
-        // en-passant heuristic
         const isPawn = moving.t === 'p';
         const diagonal = from.c !== to.c;
         const targetEmpty = !dest;
@@ -379,10 +514,16 @@
           const row = from.r;
           if (to.c === 6){
             const rf = { r: row, c: 7 }, rt = { r: row, c: 5 };
-            if (tempBoard[rf.r][rf.c]?.t === 'r'){ tempBoard[rt.r][rt.c] = { ...tempBoard[rf.r][rf.c] }; tempBoard[rf.r][rf.c] = null; }
+            if (tempBoard[rf.r][rf.c]?.t === 'r'){
+              tempBoard[rt.r][rt.c] = { ...tempBoard[rf.r][rf.c] };
+              tempBoard[rf.r][rf.c] = null;
+            }
           } else if (to.c === 2){
             const rf = { r: row, c: 0 }, rt = { r: row, c: 3 };
-            if (tempBoard[rf.r][rf.c]?.t === 'r'){ tempBoard[rt.r][rt.c] = { ...tempBoard[rf.r][rf.c] }; tempBoard[rf.r][rf.c] = null; }
+            if (tempBoard[rf.r][rf.c]?.t === 'r'){
+              tempBoard[rt.r][rt.c] = { ...tempBoard[rf.r][rf.c] };
+              tempBoard[rf.r][rf.c] = null;
+            }
           }
         }
         if (isPawn && diagonal && targetEmpty){
@@ -403,7 +544,7 @@
       return null;
     }
   
-    // --- Controls / load ---
+    // --- Daily / random loaders (unchanged) ---
     async function loadDaily(){
       try{
         const r = await fetch('/puzzles/daily');
@@ -413,6 +554,9 @@
         startFen = p.fen;
         solution = p.moves.map(m=>m.toLowerCase());
         idx = 0; selected = null;
+        fromGamePuzzles = [];
+        fromGameIndex = -1;
+        fromGameGame = null;
   
         labId.textContent = p.id || '—';
         labRating.textContent = p.rating ? `~${p.rating}` : 'unrated';
@@ -424,7 +568,6 @@
         clearInterval(autoTimer); autoTimer = null;
         renderBoard();
   
-        // Verify immediately; if inconsistent, show why.
         const err = verifySolutionOnce(p.fen, solution);
         if (err){
           showWrong('Puzzle data looks inconsistent: ' + err);
@@ -435,7 +578,6 @@
       }
     }
 
-
     async function loadRandom(){
       try{
         const r = await fetch('/puzzles/random');
@@ -445,6 +587,9 @@
         startFen = p.fen;
         solution = p.moves.map(m=>m.toLowerCase());
         idx = 0; selected = null;
+        fromGamePuzzles = [];
+        fromGameIndex = -1;
+        fromGameGame = null;
 
         labId.textContent = p.id || '—';
         labRating.textContent = p.rating ? `~${p.rating}` : 'unrated';
@@ -464,11 +609,161 @@
       }
     }
 
-    // wire up the button
-    document.getElementById('btnRandom').onclick = loadRandom;
+    // --- New: Chess.com integration helpers ---
 
-  
+    function setGamesStatus(text){
+      gamesStatusEl.textContent = text;
+    }
+
+    function renderGamesList(data){
+      const username = (data.username || '').toLowerCase();
+      const games = Array.isArray(data.games) ? data.games : [];
+
+      gamesListEl.innerHTML = '';
+
+      if (!games.length){
+        const d = document.createElement('div');
+        d.className = 'muted';
+        d.textContent = 'No games found for the most recent month.';
+        gamesListEl.appendChild(d);
+        return;
+      }
+
+      games.forEach((g) => {
+        const youAreWhite = (g.white?.username || '').toLowerCase() === username;
+        const youAreBlack = (g.black?.username || '').toLowerCase() === username;
+        const youColor = youAreWhite ? 'White' : youAreBlack ? 'Black' : '?';
+        const opp = youAreWhite ? g.black?.username : youAreBlack ? g.white?.username : (g.white?.username || 'vs ?');
+        const yourResult = youAreWhite ? g.white?.result : youAreBlack ? g.black?.result : null;
+
+        const tc = g.time_control || '';
+        const tClass = g.time_class || '';
+
+        const btn = document.createElement('button');
+        btn.className = 'btn ghost';
+        btn.innerHTML = `
+          <span>${youColor} vs ${opp || '—'}</span>
+          <span class="muted mono">${yourResult || ''} · ${tc} ${tClass}</span>
+        `;
+
+        btn.addEventListener('click', () => {
+          startPuzzlesFromGame(username, g);
+        });
+
+        gamesListEl.appendChild(btn);
+      });
+    }
+
+    async function loadGamesForUser(){
+      const username = usernameInput.value.trim();
+      if (!username){
+        setGamesStatus('Enter username');
+        return;
+      }
+      setGamesStatus('Loading…');
+      gamesListEl.innerHTML = '';
+
+      try{
+        const res = await fetch(`/chesscom/${encodeURIComponent(username)}/games/recent`);
+        if (!res.ok){
+          setGamesStatus('Error');
+          gamesListEl.innerHTML = '<div class="muted">Failed to load games.</div>';
+          return;
+        }
+        const data = await res.json();
+        renderGamesList(data);
+        setGamesStatus(`${(data.games || []).length} games`);
+      } catch(e){
+        console.error(e);
+        setGamesStatus('Error');
+        gamesListEl.innerHTML = '<div class="muted">Failed to load games.</div>';
+      }
+    }
+
+    async function startPuzzlesFromGame(username, game){
+      if (!game || !game.pgn){
+        alertEl.style.display='block';
+        alertEl.textContent = 'That game has no PGN.';
+        return;
+      }
+      setGamesStatus('Building puzzles…');
+      alertEl.style.display='none';
+
+      try{
+        const res = await fetch('/puzzles/from-game', {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json' },
+          body: JSON.stringify({
+            pgn: game.pgn,
+            username,
+            maxPuzzles: 12
+          })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok){
+          throw new Error(data.error || 'puzzle generation failed');
+        }
+        const puzzles = Array.isArray(data.puzzles) ? data.puzzles : [];
+        if (!puzzles.length){
+          setGamesStatus('No puzzles in game');
+          alertEl.style.display='block';
+          alertEl.textContent = 'No suitable puzzle positions found in that game.';
+          return;
+        }
+
+        fromGamePuzzles  = puzzles;
+        fromGameGame     = game;
+        fromGameUsername = username;
+        fromGameIndex    = 0;
+
+        applyGamePuzzleAt(0);
+        setGamesStatus(`Puzzles: ${puzzles.length}`);
+      } catch(e){
+        console.error(e);
+        setGamesStatus('Error');
+        alertEl.style.display='block';
+        alertEl.textContent = 'Failed to build puzzles from that game.';
+      }
+    }
+
+    function applyGamePuzzleAt(i){
+      if (!fromGamePuzzles.length) return;
+      if (i < 0 || i >= fromGamePuzzles.length) return;
+      fromGameIndex = i;
+
+      const pz = fromGamePuzzles[i];
+      startFen = pz.fen;
+      solution = [String(pz.uci || '').toLowerCase()];
+      idx = 0;
+      selected = null;
+
+      parseFEN(startFen);
+      alertEl.style.display='none';
+      clearInterval(autoTimer); autoTimer = null;
+
+      const moveNo = pz.moveNumber || pz.ply || (i+1);
+      labId.textContent = fromGameGame && typeof fromGameGame.id === 'number'
+        ? `Game ${fromGameGame.id+1}, move ${moveNo}`
+        : `Move ${moveNo}`;
+      const rated = fromGameGame?.rated ? 'rated' : 'casual';
+      const tc = fromGameGame?.time_control || '';
+      const tClass = fromGameGame?.time_class || '';
+      labRating.textContent = `${rated} · ${tc} ${tClass}`.trim();
+      themesEl.textContent = 'from your game';
+      solRawEl.textContent = solution.join(' ');
+
+      renderBoard();
+
+      const err = verifySolutionOnce(startFen, solution);
+      if (err){
+        showWrong('Puzzle data looks inconsistent: ' + err);
+      }
+    }
+
+    // --- Controls / load ---
+    document.getElementById('btnRandom').onclick = loadRandom;
     document.getElementById('btnDaily').onclick = loadDaily;
+
     document.getElementById('btnReset').onclick = () => {
       if (!startFen) return;
       parseFEN(startFen);
@@ -514,6 +809,24 @@
         }
       }, 220);
     };
+
+    // NEW: Prev / Next for game-derived puzzles
+    btnNextPuzzle.onclick = () => {
+      if (!fromGamePuzzles.length) return;
+      const next = (fromGameIndex + 1) % fromGamePuzzles.length;
+      applyGamePuzzleAt(next);
+    };
+    btnPrevPuzzle.onclick = () => {
+      if (!fromGamePuzzles.length) return;
+      const prev = (fromGameIndex - 1 + fromGamePuzzles.length) % fromGamePuzzles.length;
+      applyGamePuzzleAt(prev);
+    };
+
+    // NEW: hook up username + load
+    btnLoadGames.onclick = loadGamesForUser;
+    usernameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') loadGamesForUser();
+    });
   
     // Render empty board frame quickly
     (function initEmpty(){
