@@ -19,6 +19,14 @@
     a{color:inherit; text-decoration:none}
     .container{max-width:1200px; margin:0 auto; padding:0 16px}
 
+
+    /* add this right below your @media for --square */
+    @media (max-width:600px){
+      .sq{
+        font-size:30px; /* or 28px if you want more padding */
+      }
+    }
+
     /* ===== Topbar ===== */
     .topbar{position:sticky; top:0; z-index:50; backdrop-filter:saturate(120%) blur(6px);
       background:rgba(15,20,16,.8); border-bottom:1px solid rgba(123,199,105,.12)}
@@ -54,7 +62,13 @@
     .light{ background:var(--light) } .dark{ background:var(--dark) }
     .sel{ outline:3px solid var(--accent); outline-offset:-3px }
     .hl::after{ content:""; position:absolute; inset:0; background:rgba(123,199,105,.22) }
-    .piece{ line-height:1; filter:drop-shadow(0 2px 3px rgba(0,0,0,.35)) }
+    /*.piece{ line-height:1; filter:drop-shadow(0 2px 3px rgba(0,0,0,.35)) }*/
+    .piece{
+      line-height:1;
+      filter:drop-shadow(0 2px 3px rgba(0,0,0,.35));
+      font-family: "Segoe UI Symbol", system-ui, sans-serif;
+    }
+
     .piece.w{ color:#ffffff } .piece.b{ color:#111111 }
 
     /* ===== Right panel widgets ===== */
@@ -77,7 +91,7 @@
 
     /* ===== Sections ===== */
     .lower{display:grid; grid-template-columns:2fr 1fr; gap:16px}
-    @media (max-width:1000px){ .hero-grid{grid-template-columns:1fr} .lower{grid-template-columns:1fr} .nav-links{display:none} }
+    @media (max-width:1000px){ .hero-grid{grid-template-columns:1fr} .lower{grid-template-columns:1fr} }
   </style>
 </head>
 <body>
@@ -121,11 +135,11 @@
           </div>
           <div class="row">
             <button class="btn ghost" id="flip">Flip</button>
-            <button class="btn ghost" id="engineMove">Engine Move</button>
-            <button class="btn ghost" id="finish" style="border-color:rgba(235,87,87,.35)">Finish</button>
+            <button class="btn ghost" id="engineMove" style="display:none">Engine Move</button>
+            <button class="btn ghost" id="finish" style="border-color:rgba(235,87,87,.35); display:none">Finish</button>
           </div>
         </div>
-        <div class="strip" style="margin-top:12px">
+        <div class="strip" style="margin-top:12px; display:none">
           <div class="tile"><div class="mono pill" id="evalPill">eval: —</div></div>
           <div class="tile"><div class="mono pill" id="depthPill">d: —</div></div>
           <div class="tile"><div class="mono pill" id="npsPill">nps: —</div></div>
@@ -141,7 +155,7 @@
       <div class="card pad">
         <div class="row status">
           <span id="spinner" class="spin" style="display:none"></span>
-          <span id="thinkingText">Idle</span>
+          <span id="thinkingText"></span>
         </div>
         <div class="row" style="margin-top:8px">
           <div class="clocks" style="width:100%">
@@ -149,7 +163,7 @@
             <div class="clock"><div>Black</div><strong class="mono" id="bClock">05:00</strong></div>
           </div>
         </div>
-        <div class="row" style="margin-top:8px">
+        <div class="row" style="margin-top:8px; display:none">
           <label class="label">Move time (ms)</label>
           <input id="ms" type="number" value="500" min="50" step="50">
           <label class="label">Depth</label>
@@ -157,7 +171,7 @@
         </div>
         <div class="row" style="margin-top:14px">
           <div class="tile" style="flex:1">
-            <div class="label">Moves (UCI)</div>
+            <div class="label">Moves</div>
             <div class="mono moves" id="movesSpan"></div>
           </div>
         </div>
@@ -174,17 +188,17 @@
     <section class="lower" style="padding:12px 0 28px">
       <div class="card pad">
         <div class="label">Tips</div>
-        <div class="mono">Use "Flip" to switch perspective · Try different difficulty · Engine Move requests a reply on your turn.</div>
+        <div class="mono">Use "Flip" to switch perspective · Try different difficulty </div>
       </div>
       <aside class="card pad">
         <div class="label">Shortcuts</div>
-        <div class="mono">N: New Game · F: Flip · E: Engine Move</div>
+        <div class="mono">N: New Game · F: Flip </div>
       </aside>
     </section>
   </main>
 
   <footer style="padding:24px 0 40px; color:var(--muted)">
-    <div class="container">© 2025 Ichigo · Privacy · Terms</div>
+    <div class="container" style="display:none">© 2025 Ichigo · Privacy · Terms</div>
   </footer>
 
   <!-- ===== Your original JS (unaltered) ===== -->
@@ -192,7 +206,8 @@
     // --- Piece glyphs & state ---
     const P = { w:{k:'\u2654',q:'\u2655',r:'\u2656',b:'\u2657',n:'\u2658',p:'\u2659'},
                 b:{k:'\u265A',q:'\u265B',r:'\u265C',b:'\u265D',n:'\u265E',p:'\u265F'} };
-    let boardArray = Array.from({length:8}, ()=>Array(8).fill(null));
+    // let boardArray = Array.from({length:8}, ()=>Array(8).fill(null));
+    let boardArray
     let whiteAtBottom=true, selected=null, turn='w', moveList=[], started=false;
     let currentGameId = null;
     let epTarget = null; // en passant target
@@ -212,7 +227,14 @@
 
     function setThinking(on, stats){
       spinner.style.display = on ? 'inline-block' : 'none';
-      thinkText.textContent = on ? 'Thinking…' : 'Idle';
+      // thinkText.textContent = on ? 'Thinking…' : '';
+      if (on) {
+        thinkText.textContent = 'Thinking…';
+      } else {
+        thinkText.textContent = '';
+        // or don't touch textContent here if you want to keep whatever was there before
+      }
+
       if (stats){
         depthPill.textContent = 'd: ' + (stats.depth ?? '—');
         npsPill.textContent   = 'nps: ' + (stats.nps ?? '—');
@@ -252,12 +274,46 @@
       document.getElementById('movesSpan').textContent = moveList.join(' ');
     }
 
-    function startPosition(){
+    /*function startPosition(){
       const empty = () => Array(8).fill(null);
       const back = (c)=>[{c,t:'r'},{c,t:'n'},{c,t:'b'},{c,t:'q'},{c,t:'k'},{c,t:'b'},{c,t:'n'},{c,t:'r'}];
       boardArray = [ back('b'), Array(8).fill(null).map(()=>({c:'b',t:'p'})), empty(), empty(), empty(), empty(), Array(8).fill(null).map(()=>({c:'w',t:'p'})), back('w') ];
       turn='w'; moveList=[]; selected=null; started=true; setThinking(false); epTarget=null; boardDiv.classList.remove('disabled'); resetClocks(); renderBoard();
+    }*/
+
+    function setupStartBoardArray(){
+      const empty = () => Array(8).fill(null);
+      const back = (c)=>[
+        {c,t:'r'},{c,t:'n'},{c,t:'b'},{c,t:'q'},
+        {c,t:'k'},{c,t:'b'},{c,t:'n'},{c,t:'r'}
+      ];
+
+      boardArray = [
+        back('b'),
+        Array(8).fill(null).map(()=>({c:'b',t:'p'})),
+        empty(),
+        empty(),
+        empty(),
+        empty(),
+        Array(8).fill(null).map(()=>({c:'w',t:'p'})),
+        back('w')
+      ];
+      }
+
+
+    function startPosition(){
+      setupStartBoardArray();
+      turn='w';
+      moveList=[];
+      selected=null;
+      started=true;
+      setThinking(false);
+      epTarget=null;
+      boardDiv.classList.remove('disabled');
+      resetClocks();
+      renderBoard();
     }
+
 
     function parseSq(id){ const c=id.charCodeAt(0)-97; const r=8-parseInt(id[1],10); return {r,c}; }
     function rc2sq(x){ return 'abcdefgh'[x.c] + (8 - x.r); }
@@ -322,7 +378,8 @@
     document.getElementById('finish').onclick = async ()=>{ if (!currentGameId){ log('No active game id.'); return; } try{ const r=await fetch(`/game/${currentGameId}/finish`,{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ result:'*' }) }); const data=await r.json(); if (data.pgn) log('Saved PGN:\n'+data.pgn); } catch(e){ log('Finish failed: '+(e?.message||e)); } };
     diffRange.addEventListener('input', ()=>{ diffLabel.textContent = `${diffRange.value}/5`; });
 
-    // initial empty render
+    // initial render
+    setupStartBoardArray();
     renderBoard();
 
     // minimal shortcuts

@@ -210,7 +210,7 @@
       <aside class="card pad">
         <div class="row" style="justify-content:space-between; margin-bottom:8px">
           <div class="muted">From your Chess.com games</div>
-          <span class="pill mono" id="gamesStatus">Idle</span>
+          <span id="gamesStatus"></span>
         </div>
         <div class="list">
           <div class="row">
@@ -611,8 +611,14 @@
 
     // --- New: Chess.com integration helpers ---
 
-    function setGamesStatus(text){
-      gamesStatusEl.textContent = text;
+    function setGamesStatus(on, text){
+      if (on) {
+        gamesStatusEl.textContent = text;
+      }
+
+      else {
+        gamesStatusEl.textContent = '';
+      }
     }
 
     function renderGamesList(data){
@@ -657,25 +663,25 @@
     async function loadGamesForUser(){
       const username = usernameInput.value.trim();
       if (!username){
-        setGamesStatus('Enter username');
+        setGamesStatus(false, 'Enter username');
         return;
       }
-      setGamesStatus('Loading…');
+      setGamesStatus(true, 'Loading…');
       gamesListEl.innerHTML = '';
 
       try{
         const res = await fetch(`/chesscom/${encodeURIComponent(username)}/games/recent`);
         if (!res.ok){
-          setGamesStatus('Error');
+          setGamesStatus(true, 'Error');
           gamesListEl.innerHTML = '<div class="muted">Failed to load games.</div>';
           return;
         }
         const data = await res.json();
         renderGamesList(data);
-        setGamesStatus(`${(data.games || []).length} games`);
+        setGamesStatus(true, `${(data.games || []).length} games`);
       } catch(e){
         console.error(e);
-        setGamesStatus('Error');
+        setGamesStatus(true, 'Error');
         gamesListEl.innerHTML = '<div class="muted">Failed to load games.</div>';
       }
     }
@@ -686,7 +692,7 @@
         alertEl.textContent = 'That game has no PGN.';
         return;
       }
-      setGamesStatus('Building puzzles…');
+      setGamesStatus(true, 'Building puzzles…');
       alertEl.style.display='none';
 
       try{
@@ -705,7 +711,7 @@
         }
         const puzzles = Array.isArray(data.puzzles) ? data.puzzles : [];
         if (!puzzles.length){
-          setGamesStatus('No puzzles in game');
+          setGamesStatus(true, 'No puzzles in game');
           alertEl.style.display='block';
           alertEl.textContent = 'No suitable puzzle positions found in that game.';
           return;
@@ -717,10 +723,10 @@
         fromGameIndex    = 0;
 
         applyGamePuzzleAt(0);
-        setGamesStatus(`Puzzles: ${puzzles.length}`);
+        setGamesStatus(true, `Puzzles: ${puzzles.length}`);
       } catch(e){
         console.error(e);
-        setGamesStatus('Error');
+        setGamesStatus(true, 'Error');
         alertEl.style.display='block';
         alertEl.textContent = 'Failed to build puzzles from that game.';
       }
