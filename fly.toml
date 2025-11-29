@@ -5,7 +5,7 @@ primary_region = "sjc"
   internal_port = 8080
   auto_start_machines   = true
   auto_stop_machines    = false  # keep it warm so edge never routes to a cold app
-  min_machines_running  = 2      # <-- CORRECTED THIS LINE
+  min_machines_running  = 0     # <-- CORRECTED THIS LINE
     
   [http_service.concurrency]
     type = "requests"
