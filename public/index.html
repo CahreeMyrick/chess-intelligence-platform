@@ -2,206 +2,1134 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <title>Ichigo Chess</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Ichigo</title>
   <style>
-    /* ========= Chess.com‑inspired dark green theme ========= */
-    :root{
-      --bg:#0f1410; --surface:#151b16; --surface-2:#1b221c; --text:#e6f2e6; --muted:#a7b7a9;
-      --accent:#5BA04E; --accent-2:#7BC769; --radius:16px; --shadow:0 6px 24px rgba(0,0,0,.35);
-      --square:64px; --light:#cce3d1; --dark:#2b3a2e;
+    /* ========= Design tokens ========= */
+    :root {
+      --bg: #050608;
+      --surface: #111318;
+      --surface-soft: #181b22;
+      --surface-alt: #1f222b;
+      --border-subtle: #262934;
+      --accent: #4CAF50;
+      --accent-soft: rgba(76, 175, 80, 0.12);
+      --accent-strong: #6AD06E;
+      --danger: #f87171;
+      --text: #f9fafb;
+      --text-muted: #9ca3af;
+      --radius-lg: 18px;
+      --radius-md: 12px;
+      --shadow-soft: 0 18px 50px rgba(0, 0, 0, 0.6);
+      --square-size: min(7vh, 70px);
+      --square-light: #e0e8f0;
+      --square-dark: #7a8a9a;
+      --square-light-alt: #e5f2e5;
+      --square-dark-alt: #4b5c4c;
+      --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+                   "Segoe UI", sans-serif;
     }
-    @media (max-width:600px){ :root{ --square:44px; } }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{margin:0; font:16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Helvetica, Arial;
-      color:var(--text); background:linear-gradient(180deg,#0d130f 0%, #0b100c 100%);}
-    a{color:inherit; text-decoration:none}
-    .container{max-width:1200px; margin:0 auto; padding:0 16px}
 
+    * {
+      box-sizing: border-box;
+    }
 
-    /* add this right below your @media for --square */
-    @media (max-width:600px){
-      .sq{
-        font-size:30px; /* or 28px if you want more padding */
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: radial-gradient(circle at top, #151924 0, #050608 60%);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    /* ========= Top navigation ========= */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1.5rem;
+      border-bottom: 1px solid #141722;
+      background: linear-gradient(to right, #07090c, #10131a);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .brand-mark {
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 30%, #9ef99f 0, #2e7d32 35%, #020604 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06);
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .brand-text-primary {
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-size: 0.85rem;
+    }
+
+    .brand-text-secondary {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .topbar-nav {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      font-size: 0.9rem;
+    }
+
+    .nav-link {
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      color: var(--text-muted);
+      font-weight: 500;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    /* ========= Top nav dropdowns ========= */
+    .nav-item {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .nav-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      margin-top: 0;
+      background: #050816;
+      border-radius: 12px;
+      border: 1px solid #1f2937;
+      min-width: 190px;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.75);
+      padding: 0.35rem 0.4rem;
+      opacity: 0;
+      transform: translateY(6px);
+      pointer-events: none;
+      transition: opacity 0.12s ease, transform 0.12s ease;
+      z-index: 30;
+    }
+
+    .nav-dropdown a {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.35rem 0.55rem;
+      border-radius: 0.55rem;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .nav-dropdown a span {
+      opacity: 0.8;
+      font-size: 0.75rem;
+    }
+
+    .nav-dropdown a:hover {
+      background: rgba(148, 163, 184, 0.16);
+      color: var(--text);
+    }
+
+    .nav-item:hover .nav-dropdown {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    .nav-link:hover {
+      background: rgba(148, 163, 184, 0.12);
+      color: var(--text);
+    }
+
+    .nav-link.active {
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .pill {
+      padding: 0.25rem 0.6rem;
+      font-size: 0.75rem;
+      border-radius: 999px;
+      border: 1px solid #26293a;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+    }
+
+    .btn {
+      border-radius: 999px;
+      border: none;
+      padding: 0.45rem 1rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      transition: transform 0.06s ease, box-shadow 0.12s ease, background 0.12s ease, opacity 0.12s ease;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      color: #022104;
+      box-shadow: 0 12px 30px rgba(34, 197, 94, 0.45);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 18px 40px rgba(34, 197, 94, 0.55);
+    }
+
+    .btn-outline {
+      background: transparent;
+      border: 1px solid #303441;
+      color: var(--text);
+    }
+
+    .btn-outline:hover {
+      background: rgba(148, 163, 184, 0.12);
+    }
+
+    .chip-online {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.78rem;
+      color: #6ee7b7;
+    }
+
+    .chip-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: #22c55e;
+      box-shadow: 0 0 10px rgba(34, 197, 94, 0.8);
+    }
+
+    /* ========= Layout ========= */
+    .page {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      padding: 1.25rem 1.25rem 1.75rem;
+    }
+
+    .shell {
+      max-width: 1200px;
+      width: 100%;
+      display: grid;
+      grid-template-columns: minmax(0, 3fr) minmax(280px, 2fr);
+      gap: 1.25rem;
+    }
+
+    @media (max-width: 960px) {
+      .shell {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .topbar-nav {
+        display: none;
+      }
+      .page {
+        padding-inline: 0.75rem;
       }
     }
 
-    /* ===== Topbar ===== */
-    .topbar{position:sticky; top:0; z-index:50; backdrop-filter:saturate(120%) blur(6px);
-      background:rgba(15,20,16,.8); border-bottom:1px solid rgba(123,199,105,.12)}
-    .nav{display:flex; align-items:center; justify-content:space-between; height:64px}
-    .brand{display:flex; align-items:center; gap:10px; font-weight:800}
-    .brand .logo{width:28px; height:28px; display:grid; place-items:center; border-radius:8px;
-      background:radial-gradient(70% 70% at 30% 30%, var(--accent-2), var(--accent));
-      box-shadow:0 3px 12px rgba(123,199,105,.35)}
-    .nav-links{display:flex; gap:18px; align-items:center}
-    .nav-links a{padding:8px 10px; border-radius:10px; color:var(--muted)}
-    .nav-links a.active, .nav-links a:hover{background:var(--surface-2); color:var(--text)}
-    .actions{display:flex; align-items:center; gap:12px}
-    .btn{padding:8px 12px; border-radius:12px; display:inline-flex; align-items:center; gap:8px; font-weight:600; border:1px solid transparent; cursor:pointer}
-    .btn.ghost{background:transparent; color:var(--text); border-color:rgba(123,199,105,.25)}
-    .btn.primary{background:linear-gradient(180deg, var(--accent-2), var(--accent)); color:#0a120a; box-shadow:0 8px 20px rgba(91,160,78,.35)}
-    .btn.primary:hover{filter:saturate(105%)}
-    .btn.ghost:hover{background:var(--surface-2)}
+    /* ========= Main board card ========= */
+    .card {
+      background: radial-gradient(circle at top left, #22263a 0, #10131a 40%, #050608 100%);
+      border-radius: var(--radius-lg);
+      border: 1px solid rgba(15, 23, 42, 0.9);
+      box-shadow: var(--shadow-soft);
+      padding: 1.1rem 1.1rem 1.2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+      position: relative;
+      overflow: hidden;
+    }
 
-    /* ===== Cards & layout ===== */
-    .card{background:var(--surface); border:1px solid rgba(123,199,105,.10); border-radius:var(--radius); box-shadow:var(--shadow)}
-    .pad{padding:16px}
-    .hero{padding:20px 0 12px}
-    .hero-grid{display:grid; grid-template-columns:1.1fr .9fr; gap:20px}
-    .strip{display:flex; gap:12px; margin-top:12px}
-    .tile{flex:1; padding:12px 14px; background:var(--surface-2); border-radius:12px; border:1px solid rgba(123,199,105,.10)}
-    .label{font-size:.92rem; color:var(--muted)}
-    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace}
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
 
-    /* ===== Board (kept from your logic; recolored) ===== */
-    #board{ display:grid; grid-template-columns:repeat(8, var(--square)); grid-template-rows:repeat(8, var(--square));
-      border:1px solid rgba(123,199,105,.15); border-radius:14px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,.35); transition:opacity .2s ease }
-    .sq{ display:flex; align-items:center; justify-content:center; font-size:38px; user-select:none; cursor:pointer; position:relative }
-    .light{ background:var(--light) } .dark{ background:var(--dark) }
-    .sel{ outline:3px solid var(--accent); outline-offset:-3px }
-    .hl::after{ content:""; position:absolute; inset:0; background:rgba(123,199,105,.22) }
-    /*.piece{ line-height:1; filter:drop-shadow(0 2px 3px rgba(0,0,0,.35)) }*/
-    .piece{
-      line-height:1;
-      filter:drop-shadow(0 2px 3px rgba(0,0,0,.35));
+    .card-title-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.18rem;
+    }
+
+    .card-title {
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--text-muted);
+    }
+
+    .card-subtitle {
+      font-size: 1.05rem;
+      font-weight: 600;
+    }
+
+    .card-subtitle span {
+      color: var(--accent-strong);
+    }
+
+    .card-meta {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+    }
+
+    .card-meta-sep::before {
+      content: "•";
+      margin: 0 0.4rem;
+      color: #4b5563;
+    }
+
+    .card-controls {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.5rem;
+    }
+
+    .speed-select {
+      display: inline-flex;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid #1f2937;
+      padding: 0.1rem;
+    }
+
+    .speed-pill {
+      padding: 0.25rem 0.7rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: background 0.12s ease, color 0.12s ease;
+    }
+
+    .speed-pill.active {
+      background: #111827;
+      color: var(--accent-strong);
+    }
+
+    /* extra controls row (play as / difficulty / flip) */
+    .card-options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.8rem;
+    }
+
+    .card-option-group {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+    }
+
+    .card-option-group-right {
+      margin-left: auto;
+    }
+
+    /* ========= Board + players ========= */
+    .board-shell {
+      display: grid;
+      grid-template-columns: auto;
+      justify-content: center;
+      gap: 0.4rem;
+    }
+
+    .players {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.85rem;
+    }
+
+    .player {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      min-width: 0;
+    }
+
+    .avatar {
+      width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 20%, #e5e7eb 0, #4b5563 40%, #020617 100%);
+      border: 1px solid #4b5563;
+      flex-shrink: 0;
+    }
+
+    .avatar.me {
+      background: radial-gradient(circle at 30% 20%, #bbf7d0 0, #16a34a 40%, #022c22 100%);
+      border-color: #22c55e;
+    }
+
+    .player-main {
+      display: flex;
+      flex-direction: column;
+      gap: 0.12rem;
+      min-width: 0;
+    }
+
+    .player-name {
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .player-meta {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .clock {
+      font-variant-numeric: tabular-nums;
+      padding: 0.15rem 0.6rem;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.96);
+      border: 1px solid #1f2937;
+      font-size: 0.78rem;
+    }
+
+    .clock.active {
+      background: rgba(22, 163, 74, 0.16);
+      border-color: #22c55e;
+      color: #bbf7d0;
+    }
+
+    /* Board grid wrapper */
+    .board-wrapper {
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      border: 1px solid #020617;
+      box-shadow: 0 18px 35px rgba(0,0,0,0.85);
+      background: radial-gradient(circle at top, #4b5563 0, #020617 55%);
+      padding: 0.65rem;
+      position: relative;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(8, var(--square-size));
+      grid-template-rows: repeat(8, var(--square-size));
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid rgba(15, 23, 42, 0.9);
+    }
+
+    /* squares rendered by JS */
+    .sq {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: calc(var(--square-size) * 0.55);
+      line-height: 1;
+      user-select: none;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .sq.light {
+      background: var(--square-light-alt);
+    }
+    .sq.dark {
+      background: var(--square-dark-alt);
+    }
+
+    .sq.sel {
+      box-shadow: inset 0 0 0 3px rgba(250, 204, 21, 0.9);
+    }
+
+    .sq.hl::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgba(59, 130, 246, 0.27);
+    }
+
+    .piece {
+      line-height: 1;
+      filter: drop-shadow(0 2px 3px rgba(0,0,0,.35));
       font-family: "Segoe UI Symbol", system-ui, sans-serif;
     }
 
-    .piece.w{ color:#ffffff } .piece.b{ color:#111111 }
+    .piece.w { color:#ffffff }
+    .piece.b { color:#111111 }
 
-    /* ===== Right panel widgets ===== */
-    .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
-    .clocks{display:flex; gap:12px}
-    .clock{flex:1; text-align:center; padding:10px; border-radius:10px; background:var(--surface-2); border:1px solid rgba(123,199,105,.10)}
-    .clock strong{display:block; font-size:1.2rem}
-    input[type=number], select, input[type=range]{ background:#0f1512; color:var(--text); border:1px solid rgba(123,199,105,.22); border-radius:8px; padding:6px 8px }
-    pre{ background:#0f1512; padding:10px; border-radius:10px; max-height:260px; overflow:auto; border:1px solid rgba(123,199,105,.12) }
-    .moves{ min-height:32px }
-    .pill{ padding:2px 8px; border-radius:999px; background:var(--surface-2); border:1px solid rgba(123,199,105,.22) }
-    .spin{ width:14px; height:14px; border:2px solid rgba(123,199,105,.22); border-top-color:var(--accent-2); border-radius:999px; animation:spin 1s linear infinite }
-    @keyframes spin{ to{ transform:rotate(360deg) } }
-    .disabled{ pointer-events:none; opacity:.6 }
+    @media (max-width: 600px) {
+      .sq {
+        font-size: 30px;
+      }
+    }
 
-    /* ===== Banner ===== */
-    .banner{ display:none; margin:12px 0 0; padding:12px 14px; border:1px solid rgba(123,199,105,.25);
-      background:var(--surface-2); color:var(--text); border-radius:12px; font-weight:600 }
-    .banner .meta{ font-weight:400; opacity:.9; margin-left:8px }
+    /* ========= Bottom controls ========= */
+    .board-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      margin-top: 0.4rem;
+    }
 
-    /* ===== Sections ===== */
-    .lower{display:grid; grid-template-columns:2fr 1fr; gap:16px}
-    @media (max-width:1000px){ .hero-grid{grid-template-columns:1fr} .lower{grid-template-columns:1fr} }
+    .controls-main {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .controls-main .btn {
+      font-size: 0.8rem;
+      padding-inline: 0.85rem;
+      padding-block: 0.35rem;
+    }
+
+    .eval-bar {
+      flex: 1;
+      height: 8px;
+      border-radius: 999px;
+      background: #020617;
+      border: 1px solid #111827;
+      overflow: hidden;
+      display: flex;
+    }
+
+    .eval-bar-white {
+      background: #f9fafb;
+      width: 48%;
+    }
+
+    .eval-bar-black {
+      background: #020617;
+      width: 52%;
+    }
+
+    .eval-score {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-left: 0.5rem;
+      min-width: 42px;
+    }
+
+    /* ========= Right side panel ========= */
+    .side-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+
+    .side-card {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-subtle);
+      padding: 0.85rem 0.9rem;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .side-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .side-card-title {
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--text-muted);
+    }
+
+    .tab-row {
+      display: inline-flex;
+      background: #050816;
+      border-radius: 999px;
+      border: 1px solid #1f2937;
+      padding: 0.1rem;
+      font-size: 0.78rem;
+    }
+
+    .tab-pill {
+      padding: 0.25rem 0.7rem;
+      border-radius: 999px;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+
+    .tab-pill.active {
+      background: #111827;
+      color: var(--accent-strong);
+    }
+
+    .moves-list {
+      max-height: 220px;
+      overflow: auto;
+      font-size: 0.8rem;
+      border-radius: 0.75rem;
+      background: radial-gradient(circle at top, #020617 0, #020617 45%, #020617 100%);
+      border: 1px solid #111827;
+      padding: 0.5rem 0.6rem;
+    }
+
+    .side-footer-text {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .side-footer-text strong {
+      color: #e5e7eb;
+    }
+
+    .tag-pill {
+      font-size: 0.7rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 999px;
+      border: 1px solid #374151;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .side-card-small-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      font-size: 0.8rem;
+    }
+
+    .small-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.35rem 0.5rem;
+      border-radius: 0.6rem;
+      background: var(--surface-soft);
+    }
+
+    .small-item-label {
+      color: var(--text-muted);
+    }
+
+    .small-item-value {
+      font-weight: 500;
+    }
+
+    .small-item-value-positive {
+      color: #4ade80;
+    }
+
+    .small-item-value-negative {
+      color: var(--danger);
+    }
+
+    /* ========= Footer ========= */
+    .footer {
+      padding: 0.75rem 1.5rem 1.25rem;
+      border-top: 1px solid #111827;
+      font-size: 0.75rem;
+      color: #6b7280;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .footer span {
+      opacity: 0.85;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .footer-links a {
+      color: #9ca3af;
+    }
+
+    @media (max-width: 640px) {
+      .footer {
+        flex-direction: column;
+        align-items: flex-start;
+        padding-inline: 0.9rem;
+      }
+    }
+
+    /* ========= Legacy / JS-hooked utility styles ========= */
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    }
+
+    .spin {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(148, 163, 184, 0.4);
+      border-top-color: var(--accent-strong);
+      border-radius: 999px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .disabled {
+      pointer-events: none;
+      opacity: 0.6;
+    }
+
+    input[type=number], select, input[type=range] {
+      background: #0f1512;
+      color: var(--text);
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      border-radius: 8px;
+      padding: 6px 8px;
+      font-size: 0.8rem;
+    }
+
+    pre {
+      background: #050816;
+      padding: 10px;
+      border-radius: 10px;
+      max-height: 260px;
+      overflow: auto;
+      border: 1px solid #111827;
+      font-size: 0.75rem;
+    }
+
+    .banner {
+      display: none;
+      margin: 12px 0 0;
+      padding: 12px 14px;
+      border: 1px solid rgba(148, 163, 184, 0.6);
+      background: var(--surface-alt);
+      color: var(--text);
+      border-radius: 12px;
+      font-weight: 600;
+    }
+
+    .banner .meta {
+      font-weight: 400;
+      opacity: 0.9;
+      margin-left: 8px;
+    }
+
+    .side-status {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .side-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.4rem;
+      margin-top: 0.35rem;
+      font-size: 0.78rem;
+    }
+
+    .engine-metrics {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      font-size: 0.75rem;
+    }
   </style>
 </head>
 <body>
-  <!-- ===== Header ===== -->
+  <!-- ========= Top bar ========= -->
   <header class="topbar">
-    <div class="container nav">
-      <div class="brand"><div class="logo">♟</div><span>Ichigo</span></div>
-      <nav class="nav-links">
-        <a href="#" class="active">Play</a>
-        <a href="/puzzles.html">Puzzles</a>
-
-        <!--<a href="#">Learn</a>
-        <a href="#">Watch</a>
-        <a href="#">News</a>-->
-        
-      </nav>
-      <div class="actions">
-        <!-- <a class="btn ghost" href="/games.html">My Games</a> -->
-        <button class="btn primary" id="new">New Game</button>
+    <div class="brand">
+      <div class="brand-mark">IG</div>
+      <div>
+        <div class="brand-text-primary">Ichigo</div>
+        <div class="brand-text-secondary">Play • Train • Analyze</div>
       </div>
+    </div>
+
+    <nav class="topbar-nav">
+      <!-- Play -->
+      <div class="nav-item">
+        <a href="#" class="nav-link active">Play</a>
+        <div class="nav-dropdown">
+          <a href="#">
+            Play online
+            <span>Match vs players</span>
+          </a>
+          <a href="#">
+            Play vs bot
+            <span>Ichigo engine</span>
+          </a>
+          <a href="#">
+            Custom game
+            <span>Time &amp; color</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Puzzles -->
+      <div class="nav-item">
+        <a href="/puzzles.html" class="nav-link">Puzzles</a>
+        <div class="nav-dropdown">
+          <a href="#">
+            Daily puzzle
+            <span>One challenge / day</span>
+          </a>
+          <a href="#">
+            Random puzzles
+            <span>Endless tactics</span>
+          </a>
+          <a href="#">
+            From your games
+            <span>Fix your blunders</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Analysis -->
+      <div class="nav-item">
+        <a href="#" class="nav-link">Analysis</a>
+        <div class="nav-dropdown">
+          <a href="#">
+            Analyze game
+            <span>Upload PGN</span>
+          </a>
+          <a href="#">
+            Live analysis
+            <span>With engine</span>
+          </a>
+          <a href="#">
+            Opening explorer
+            <span>See theory</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Learn -->
+      <div class="nav-item">
+        <a href="#" class="nav-link">Learn</a>
+        <div class="nav-dropdown">
+          <a href="#">
+            Lessons
+            <span>Structured topics</span>
+          </a>
+          <a href="#">
+            Drills
+            <span>Pattern training</span>
+          </a>
+          <a href="#">
+            Endgames
+            <span>Key techniques</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- TV -->
+      <div class="nav-item">
+        <a href="#" class="nav-link">TV</a>
+        <div class="nav-dropdown">
+          <a href="#">
+            Top games
+            <span>Watch strong players</span>
+          </a>
+          <a href="#">
+            Streams
+            <span>Live channels</span>
+          </a>
+          <a href="#">
+            Events
+            <span>Tournaments &amp; matches</span>
+          </a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="topbar-actions">
+      <div class="chip-online">
+        <span class="chip-dot"></span>
+        <span>3,842 online</span>
+      </div>
+      <span class="pill">Beta</span>
+      <button class="btn btn-outline">Log in</button>
+      <button class="btn btn-primary" id="new">New game</button>
     </div>
   </header>
 
-  <!-- ===== Main ===== -->
-  <main class="container">
-    <section class="hero hero-grid">
-      <!-- Left: Board & quick KPIs -->
-      <div class="card pad">
-        <div class="row" style="justify-content:space-between">
-          <div class="row">
-            <label class="label">Play as</label>
+  <!-- ========= Main content ========= -->
+  <main class="page">
+    <div class="shell">
+      <!-- Left: Board / main card -->
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-title">New game</div>
+            <div class="card-subtitle">Play vs <span>Ichigo Engine</span></div>
+            <div class="card-meta">
+              <span>3+2 Blitz</span>
+              <span class="card-meta-sep">Rated</span>
+              <span>Engine level: 2 / 5</span>
+            </div>
+          </div>
+          <div class="card-controls">
+            <div class="speed-select">
+              <button class="speed-pill active">Bullet</button>
+              <button class="speed-pill">Blitz</button>
+              <button class="speed-pill">Rapid</button>
+            </div>
+            <!-- Secondary New Game button (optional)
+                 If you prefer the main "New game" here instead of in the topbar,
+                 move id="new" from the topbar to this button. -->
+            <!-- <button class="btn btn-primary" id="new">New game</button> -->
+          </div>
+        </div>
+
+        <!-- Engine metrics (wired to JS) -->
+        <div class="engine-metrics">
+          <span class="pill mono" id="evalPill">eval: —</span>
+          <span class="pill mono" id="depthPill">d: —</span>
+          <span class="pill mono" id="npsPill">nps: —</span>
+        </div>
+
+        <!-- Options row: play as / difficulty / flip / hidden controls -->
+        <div class="card-options">
+          <div class="card-option-group">
+            <span class="label">Play as</span>
             <select id="playAs">
               <option value="w" selected>White</option>
               <option value="b">Black</option>
             </select>
           </div>
-          <div class="row">
-            <label class="label">Difficulty</label>
-            <input id="difficulty" type="range" min="1" max="5" step="1" value="2"/>
+          <div class="card-option-group">
+            <span class="label">Difficulty</span>
+            <input id="difficulty" type="range" min="1" max="5" step="1" value="2" />
             <span class="pill" id="diffLabel">2/5</span>
           </div>
-          <div class="row">
-            <button class="btn ghost" id="flip">Flip</button>
-            <button class="btn ghost" id="engineMove" style="display:none">Engine Move</button>
-            <button class="btn ghost" id="finish" style="border-color:rgba(235,87,87,.35); display:none">Finish</button>
+          <div class="card-option-group card-option-group-right">
+            <button class="btn btn-outline" id="flip">Flip</button>
+            <button class="btn btn-outline" id="engineMove" style="display:none">Engine Move</button>
+            <button class="btn btn-outline" id="finish" style="border-color:rgba(235,87,87,.65); display:none">
+              Finish
+            </button>
           </div>
         </div>
-        <div class="strip" style="margin-top:12px; display:none">
-          <div class="tile"><div class="mono pill" id="evalPill">eval: —</div></div>
-          <div class="tile"><div class="mono pill" id="depthPill">d: —</div></div>
-          <div class="tile"><div class="mono pill" id="npsPill">nps: —</div></div>
+
+        <div class="board-shell">
+          <!-- Players (top = black) -->
+          <div class="players">
+            <div class="player">
+              <div class="avatar"></div>
+              <div class="player-main">
+                <span class="player-name">Stockfish (Ichigo)</span>
+                <span class="player-meta">Engine • 2600</span>
+              </div>
+            </div>
+            <div class="clock" id="bClock">05:00</div>
+          </div>
+
+          <!-- Board -->
+          <div class="board-wrapper">
+            <div id="board" class="board"></div>
+          </div>
+
+          <!-- Players (bottom = white) -->
+          <div class="players">
+            <div class="player">
+              <div class="avatar me"></div>
+              <div class="player-main">
+                <span class="player-name">You</span>
+                <span class="player-meta">Guest • Unrated</span>
+              </div>
+            </div>
+            <div class="clock active" id="wClock">05:00</div>
+          </div>
+
+          <!-- Board footer: controls + eval bar (purely visual for now) -->
+          <div class="board-footer">
+            <div class="controls-main">
+              <button class="btn btn-outline">Undo</button>
+              <button class="btn btn-outline">Hint</button>
+              <button class="btn btn-outline">Analyze</button>
+            </div>
+            <div style="display:flex;align-items:center;flex:1;justify-content:flex-end;gap:0.35rem;">
+              <div class="eval-bar">
+                <div class="eval-bar-white"></div>
+                <div class="eval-bar-black"></div>
+              </div>
+              <div class="eval-score">+0.3</div>
+            </div>
+          </div>
         </div>
-        <div class="strip" style="margin-top:12px">
-          <div id="board"></div>
-        </div>
+
+        <!-- Game over banner (wired to JS) -->
         <div id="gameBanner" class="banner"></div>
-        <div class="label" style="margin-top:6px">Click <strong>New Game</strong> to start.</div>
-      </div>
+      </section>
 
-      <!-- Right: Status / clocks / controls / logs  -->
-      <div class="card pad">
-        <div class="row status">
-          <span id="spinner" class="spin" style="display:none"></span>
-          <span id="thinkingText"></span>
-        </div>
-        <div class="row" style="margin-top:8px">
-          <div class="clocks" style="width:100%">
-            <div class="clock"><div>White</div><strong class="mono" id="wClock">05:00</strong></div>
-            <div class="clock"><div>Black</div><strong class="mono" id="bClock">05:00</strong></div>
+      <!-- Right: Moves / status / log / extras -->
+      <aside class="side-panel">
+        <section class="side-card">
+          <div class="side-card-header">
+            <div class="side-card-title">Current game</div>
+            <div class="tab-row">
+              <button class="tab-pill active">Moves</button>
+              <button class="tab-pill">Engine</button>
+              <button class="tab-pill">Notes</button>
+            </div>
           </div>
-        </div>
-        <div class="row" style="margin-top:8px; display:none">
-          <label class="label">Move time (ms)</label>
-          <input id="ms" type="number" value="500" min="50" step="50">
-          <label class="label">Depth</label>
-          <input id="depth" type="number" min="1" step="1" placeholder="">
-        </div>
-        <div class="row" style="margin-top:14px">
-          <div class="tile" style="flex:1">
-            <div class="label">Moves</div>
-            <div class="mono moves" id="movesSpan"></div>
-          </div>
-        </div>
-        <div class="row" style="margin-top:14px">
-          <div class="tile" style="flex:1">
-            <div class="label">Log</div>
-            <pre id="log"></pre>
-          </div>
-        </div>
-      </div>
-    </section>
 
-    <!-- Lower area for future feed/leaderboard etc. -->
-    <section class="lower" style="padding:12px 0 28px">
-      <div class="card pad">
-        <div class="label">Tips</div>
-        <div class="mono">Use "Flip" to switch perspective · Try different difficulty </div>
-      </div>
-      <aside class="card pad">
-        <div class="label">Shortcuts</div>
-        <div class="mono">N: New Game · F: Flip </div>
+          <!-- Engine thinking status -->
+          <div class="side-status">
+            <span id="spinner" class="spin" style="display:none"></span>
+            <span id="thinkingText"></span>
+          </div>
+
+          <!-- Moves text (wired to JS) -->
+          <div class="moves-list">
+            <div id="movesSpan" class="mono"></div>
+          </div>
+
+          <!-- Hidden engine timing settings (wired to JS, kept hidden as before) -->
+          <div class="side-row" style="display:none;">
+            <label class="label">Move time (ms)</label>
+            <input id="ms" type="number" value="500" min="50" step="50">
+            <label class="label">Depth</label>
+            <input id="depth" type="number" min="1" step="1" placeholder="">
+          </div>
+
+          <div class="side-footer-text">
+            <span><strong>Engine</strong> • Ichigo</span>
+            <span class="tag-pill">Beta</span>
+          </div>
+        </section>
+
+        <section class="side-card">
+          <div class="side-card-header">
+            <div class="side-card-title">Engine log</div>
+          </div>
+          <pre id="log" class="mono"></pre>
+        </section>
+
+        <!-- Optional: keep performance + training cards as static placeholders -->
+        <section class="side-card">
+          <div class="side-card-header">
+            <div class="side-card-title">Performance snapshot</div>
+          </div>
+          <div class="side-card-small-list">
+            <div class="small-item">
+              <span class="small-item-label">Blunders (last 20 games)</span>
+              <span class="small-item-value small-item-value-positive">−23%</span>
+            </div>
+            <div class="small-item">
+              <span class="small-item-label">Tactical accuracy vs 1200–1400</span>
+              <span class="small-item-value">83%</span>
+            </div>
+            <div class="small-item">
+              <span class="small-item-label">Endgame conversion (won positions)</span>
+              <span class="small-item-value small-item-value-negative">64%</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="side-card">
+          <div class="side-card-header">
+            <div class="side-card-title">Continue training</div>
+          </div>
+          <div class="side-card-small-list">
+            <div class="small-item">
+              <span class="small-item-label">Puzzle streak</span>
+              <span class="small-item-value">Daily target: 15</span>
+            </div>
+            <div class="small-item">
+              <span class="small-item-label">Load games from Chess.com</span>
+              <button class="btn btn-outline" style="font-size:0.75rem;padding:0.25rem 0.7rem;">
+                Connect
+              </button>
+            </div>
+            <div class="small-item">
+              <span class="small-item-label">Train from your blunders</span>
+              <button class="btn btn-primary" style="font-size:0.75rem;padding:0.25rem 0.7rem;">
+                Start blunder set
+              </button>
+            </div>
+          </div>
+        </section>
       </aside>
-    </section>
+    </div>
   </main>
 
-  <footer style="padding:24px 0 40px; color:var(--muted)">
-    <div class="container" style="display:none">© 2025 Ichigo · Privacy · Terms</div>
+  <!-- ========= Footer ========= -->
+  <footer class="footer">
+    <span>© 2025 Ichigo Chess. Engine &amp; site by you.</span>
+    <div class="footer-links">
+      <a href="#">About</a>
+      <a href="#">Feedback</a>
+      <a href="#">Terms</a>
+      <a href="#">Privacy</a>
+    </div>
   </footer>
 
-  <!-- ===== Your original JS (unaltered) ===== -->
+  <!-- ========= Your original JS (unchanged) ========= -->
   <script>
     // --- Piece glyphs & state ---
     const P = { w:{k:'\u2654',q:'\u2655',r:'\u2656',b:'\u2657',n:'\u2658',p:'\u2659'},
@@ -273,13 +1201,6 @@
       }
       document.getElementById('movesSpan').textContent = moveList.join(' ');
     }
-
-    /*function startPosition(){
-      const empty = () => Array(8).fill(null);
-      const back = (c)=>[{c,t:'r'},{c,t:'n'},{c,t:'b'},{c,t:'q'},{c,t:'k'},{c,t:'b'},{c,t:'n'},{c,t:'r'}];
-      boardArray = [ back('b'), Array(8).fill(null).map(()=>({c:'b',t:'p'})), empty(), empty(), empty(), empty(), Array(8).fill(null).map(()=>({c:'w',t:'p'})), back('w') ];
-      turn='w'; moveList=[]; selected=null; started=true; setThinking(false); epTarget=null; boardDiv.classList.remove('disabled'); resetClocks(); renderBoard();
-    }*/
 
     function setupStartBoardArray(){
       const empty = () => Array(8).fill(null);
