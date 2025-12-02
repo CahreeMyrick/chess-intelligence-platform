@@ -501,6 +501,11 @@
       background: rgba(59, 130, 246, 0.27);
     }
 
+    .sq.hint {
+      box-shadow: inset 0 0 0 2px rgba(234, 179, 8, 0.95);
+    }
+
+
     .piece {
       line-height: 1;
       filter: drop-shadow(0 2px 3px rgba(0,0,0,.35));
@@ -814,18 +819,22 @@
       <div class="nav-item">
         <a href="#" class="nav-link active">Play</a>
         <div class="nav-dropdown">
+          <!--
           <a href="#">
             Play online
             <span>Match vs players</span>
           </a>
+          -->
           <a href="#">
             Play vs bot
             <span>Ichigo engine</span>
           </a>
+          <!--
           <a href="#">
             Custom game
             <span>Time &amp; color</span>
           </a>
+          -->
         </div>
       </div>
 
@@ -834,22 +843,22 @@
         <a href="/puzzles.html" class="nav-link">Puzzles</a>
         <div class="nav-dropdown">
           <a href="#">
-            Daily puzzle
-            <span>One challenge / day</span>
+            Daily puzzle  
+            <!--<span>One challenge / day</span>-->
           </a>
           <a href="#">
             Random puzzles
-            <span>Endless tactics</span>
+            <!--<span>Endless tactics</span>-->
           </a>
           <a href="#">
             From your games
-            <span>Fix your blunders</span>
+            <!--<span>Fix your blunders</span>-->
           </a>
         </div>
       </div>
 
       <!-- Analysis -->
-      <div class="nav-item">
+      <div class="nav-item" style="display:none">
         <a href="#" class="nav-link">Analysis</a>
         <div class="nav-dropdown">
           <a href="#">
@@ -868,7 +877,7 @@
       </div>
 
       <!-- Learn -->
-      <div class="nav-item">
+      <div class="nav-item" style="display:none">
         <a href="#" class="nav-link">Learn</a>
         <div class="nav-dropdown">
           <a href="#">
@@ -887,7 +896,7 @@
       </div>
 
       <!-- TV -->
-      <div class="nav-item">
+      <div class="nav-item" style="display:none">
         <a href="#" class="nav-link">TV</a>
         <div class="nav-dropdown">
           <a href="#">
@@ -907,12 +916,15 @@
     </nav>
 
     <div class="topbar-actions">
+      <!--
       <div class="chip-online">
         <span class="chip-dot"></span>
         <span>3,842 online</span>
       </div>
-      <span class="pill">Beta</span>
-      <button class="btn btn-outline">Log in</button>
+      -->
+
+      <!--<span class="pill">Beta</span>
+      <button class="btn btn-outline" style="display:none">Log in</button> -->
       <button class="btn btn-primary" id="new">New game</button>
     </div>
   </header>
@@ -927,16 +939,16 @@
             <div class="card-title">New game</div>
             <div class="card-subtitle">Play vs <span>Ichigo Engine</span></div>
             <div class="card-meta">
-              <span>3+2 Blitz</span>
-              <span class="card-meta-sep">Rated</span>
-              <span>Engine level: 2 / 5</span>
+              <span>5 Minute Blitz</span>
+              <!--<span class="card-meta-sep">Rated</span>-->
+              <!--<span>Engine level: 2 / 5</span>-->
             </div>
           </div>
           <div class="card-controls">
             <div class="speed-select">
-              <button class="speed-pill active">Bullet</button>
-              <button class="speed-pill">Blitz</button>
-              <button class="speed-pill">Rapid</button>
+              <button class="speed-pill active" style="display:none">Bullet</button>
+              <button class="speed-pill" style="display:none">Blitz</button>
+              <button class="speed-pill" style="display:none">Rapid</button>
             </div>
             <!-- Secondary New Game button (optional)
                  If you prefer the main "New game" here instead of in the topbar,
@@ -945,12 +957,15 @@
           </div>
         </div>
 
+
         <!-- Engine metrics (wired to JS) -->
+        <!-- 
         <div class="engine-metrics">
           <span class="pill mono" id="evalPill">eval: —</span>
           <span class="pill mono" id="depthPill">d: —</span>
           <span class="pill mono" id="npsPill">nps: —</span>
         </div>
+        -->
 
         <!-- Options row: play as / difficulty / flip / hidden controls -->
         <div class="card-options">
@@ -961,7 +976,7 @@
               <option value="b">Black</option>
             </select>
           </div>
-          <div class="card-option-group">
+          <div class="card-option-group" style="display:none">
             <span class="label">Difficulty</span>
             <input id="difficulty" type="range" min="1" max="5" step="1" value="2" />
             <span class="pill" id="diffLabel">2/5</span>
@@ -981,8 +996,8 @@
             <div class="player">
               <div class="avatar"></div>
               <div class="player-main">
-                <span class="player-name">Stockfish (Ichigo)</span>
-                <span class="player-meta">Engine • 2600</span>
+                <span class="player-name">Ichigo</span>
+                <span class="player-meta">Engine</span>
               </div>
             </div>
             <div class="clock" id="bClock">05:00</div>
@@ -999,7 +1014,7 @@
               <div class="avatar me"></div>
               <div class="player-main">
                 <span class="player-name">You</span>
-                <span class="player-meta">Guest • Unrated</span>
+                <span class="player-meta">Guest</span>
               </div>
             </div>
             <div class="clock active" id="wClock">05:00</div>
@@ -1008,16 +1023,17 @@
           <!-- Board footer: controls + eval bar (purely visual for now) -->
           <div class="board-footer">
             <div class="controls-main">
-              <button class="btn btn-outline">Undo</button>
-              <button class="btn btn-outline">Hint</button>
-              <button class="btn btn-outline">Analyze</button>
+              <button class="btn btn-outline" style="display:none">Undo</button>
+              <button class="btn btn-outline" id="hintBtn">Hint</button>
+
+              <button class="btn btn-outline" style="display:none">Analyze</button>
             </div>
             <div style="display:flex;align-items:center;flex:1;justify-content:flex-end;gap:0.35rem;">
-              <div class="eval-bar">
+              <div class="eval-bar" style="display:none">
                 <div class="eval-bar-white"></div>
                 <div class="eval-bar-black"></div>
               </div>
-              <div class="eval-score">+0.3</div>
+              <div class="eval-score" style="display:none"></div>
             </div>
           </div>
         </div>
@@ -1026,9 +1042,11 @@
         <div id="gameBanner" class="banner"></div>
       </section>
 
+    
       <!-- Right: Moves / status / log / extras -->
       <aside class="side-panel">
         <section class="side-card">
+          <!--
           <div class="side-card-header">
             <div class="side-card-title">Current game</div>
             <div class="tab-row">
@@ -1037,6 +1055,8 @@
               <button class="tab-pill">Notes</button>
             </div>
           </div>
+          -->
+
 
           <!-- Engine thinking status -->
           <div class="side-status">
@@ -1070,7 +1090,9 @@
           <pre id="log" class="mono"></pre>
         </section>
 
+
         <!-- Optional: keep performance + training cards as static placeholders -->
+        <!--
         <section class="side-card">
           <div class="side-card-header">
             <div class="side-card-title">Performance snapshot</div>
@@ -1114,11 +1136,13 @@
             </div>
           </div>
         </section>
+        -->
       </aside>
     </div>
   </main>
 
   <!-- ========= Footer ========= -->
+ <!--
   <footer class="footer">
     <span>© 2025 Ichigo Chess. Engine &amp; site by you.</span>
     <div class="footer-links">
@@ -1128,6 +1152,7 @@
       <a href="#">Privacy</a>
     </div>
   </footer>
+  -->
 
   <!-- ========= Your original JS (unchanged) ========= -->
   <script>
@@ -1139,6 +1164,8 @@
     let whiteAtBottom=true, selected=null, turn='w', moveList=[], started=false;
     let currentGameId = null;
     let epTarget = null; // en passant target
+    let hintMove = null; // UCI string like "e2e4" for suggested move
+
 
     const boardDiv = document.getElementById('board');
     const playAsSel = document.getElementById('playAs');
@@ -1146,7 +1173,7 @@
     const diffLabel = document.getElementById('diffLabel');
     const msEl = document.getElementById('ms'), depthEl = document.getElementById('depth');
     const spinner = document.getElementById('spinner'), thinkText = document.getElementById('thinkingText');
-    const evalPill = document.getElementById('evalPill'), depthPill = document.getElementById('depthPill'), npsPill = document.getElementById('npsPill');
+    // const evalPill = document.getElementById('evalPill'), depthPill = document.getElementById('depthPill'), npsPill = document.getElementById('npsPill');
     const wClock = document.getElementById('wClock'), bClock = document.getElementById('bClock');
 
     let clocks = { w: 5*60*1000, b: 5*60*1000 }, clockTimer=null;
@@ -1163,6 +1190,7 @@
         // or don't touch textContent here if you want to keep whatever was there before
       }
 
+      /*
       if (stats){
         depthPill.textContent = 'd: ' + (stats.depth ?? '—');
         npsPill.textContent   = 'nps: ' + (stats.nps ?? '—');
@@ -1172,6 +1200,7 @@
       } else {
         depthPill.textContent = 'd: —'; npsPill.textContent = 'nps: —'; evalPill.textContent = 'eval: —';
       }
+      */
     }
 
     // --- Clocks ---
@@ -1181,26 +1210,61 @@
     function fmt(ms){ ms=Math.max(ms,0); const s=Math.floor(ms/1000); const m=Math.floor(s/60); const r=s%60; return `${String(m).padStart(2,'0')}:${String(r).padStart(2,'0')}`; }
 
     // --- Rendering ---
-    function renderBoard(){
-      boardDiv.innerHTML='';
-      for(let r=0;r<8;r++){
-        for(let c=0;c<8;c++){
-          const idxR = whiteAtBottom ? r : 7-r;
-          const idxC = whiteAtBottom ? c : 7-c;
-          const sq = document.createElement('div');
-          sq.className = 'sq ' + ((r+c)%2===0 ? 'light':'dark');
+    function renderBoard() {
+      boardDiv.innerHTML = '';
+      for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+          const idxR = whiteAtBottom ? r : 7 - r;
+          const idxC = whiteAtBottom ? c : 7 - c;
+
+          let classes = 'sq ' + ((r + c) % 2 === 0 ? 'light' : 'dark');
+
           const piece = boardArray[idxR][idxC];
-          if (piece){ const span=document.createElement('span'); span.className='piece ' + (piece.c==='w'?'w':'b'); span.textContent=P[piece.c][piece.t]; sq.appendChild(span); }
-          sq.dataset.rc = idxR+','+idxC;
-          if (selected && selected.r===idxR && selected.c===idxC) sq.classList.add('sel');
-          if (moveList.length){ const last=moveList[moveList.length-1]; const f=parseSq(last.slice(0,2)), t=parseSq(last.slice(2,4));
-            if ((f.r===idxR&&f.c===idxC) || (t.r===idxR&&t.c===idxC)) sq.classList.add('hl'); }
+
+          // last move highlight (existing)
+          let isLastMoveSq = false;
+          if (moveList.length) {
+            const last = moveList[moveList.length - 1];
+            const f = parseSq(last.slice(0, 2));
+            const t = parseSq(last.slice(2, 4));
+            if ((f.r === idxR && f.c === idxC) || (t.r === idxR && t.c === idxC)) {
+              isLastMoveSq = true;
+            }
+          }
+          if (isLastMoveSq) classes += ' hl';
+
+          // selected square (existing)
+          if (selected && selected.r === idxR && selected.c === idxC) {
+            classes += ' sel';
+          }
+
+          // NEW: hint highlight
+          if (hintMove) {
+            const hf = parseSq(hintMove.slice(0, 2));
+            const ht = parseSq(hintMove.slice(2, 4));
+            if ((hf.r === idxR && hf.c === idxC) || (ht.r === idxR && ht.c === idxC)) {
+              classes += ' hint';
+            }
+          }
+
+          const sq = document.createElement('div');
+          sq.className = classes;
+
+          if (piece) {
+            const span = document.createElement('span');
+            span.className = 'piece ' + (piece.c === 'w' ? 'w' : 'b');
+            span.textContent = P[piece.c][piece.t];
+            sq.appendChild(span);
+          }
+
+          sq.dataset.rc = idxR + ',' + idxC;
           sq.addEventListener('click', onSquareClick);
           boardDiv.appendChild(sq);
         }
       }
       document.getElementById('movesSpan').textContent = moveList.join(' ');
     }
+
 
     function setupStartBoardArray(){
       const empty = () => Array(8).fill(null);
@@ -1230,6 +1294,7 @@
       started=true;
       setThinking(false);
       epTarget=null;
+      hintMove = null; // clear old hint
       boardDiv.classList.remove('disabled');
       resetClocks();
       renderBoard();
@@ -1257,7 +1322,7 @@
       const esc=s=>s.replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
       const displayPGN=(pgn||"").split("\n").filter(l=>!l.trim().startsWith("[")).join("\n").replace(/\n{3,}/g,"\n\n").trim();
       const banner=document.getElementById('gameBanner');
-      banner.innerHTML=`<div class="row"><span>${title}</span><span class="meta">Result: ${result}</span>${pgn?`<button class="btn ghost" id="dlPgn">Download PGN</button>`:''}</div>${displayPGN?`<pre class="mono" style="margin-top:8px">${esc(displayPGN)}</pre>`:''}`;
+      banner.innerHTML=`<div class="row"><span>${title}</span><span class="meta">Result: ${result}</span>${pgn?`<button class="btn ghost" id="dlPgn" style="margin-left:12px">Download PGN</button>`:''}</div>${displayPGN?`<pre class="mono" style="margin-top:8px">${esc(displayPGN)}</pre>`:''}`;
       banner.style.display='block';
       if (pgn){ const btn=document.getElementById('dlPgn'); btn.onclick=()=>{ const blob=new Blob([pgn],{type:'text/plain;charset=utf-8'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='game.pgn'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); } }
       log(`[game over] result=${result}${reason?" ("+reason+")":""}`);
@@ -1276,12 +1341,12 @@
       const prevBoard = boardArray.map(row=>row.map(cell=>cell?{...cell}:null));
       const prevTurn=turn, prevMoves=moveList.slice(), prevSelected=selected?{...selected}:null, prevEpTarget=epTarget?{...epTarget}:null;
       boardArray[to.r][to.c] = { ...moving }; boardArray[from.r][from.c] = null; const promo=uci[4]; if (promo) boardArray[to.r][to.c].t=promo; handleSpecialMoves(moving,from,to);
-      moveList.push(uci); selected=null; turn=(turn==='w'?'b':'w'); updateEpTarget(moving,from,to); renderBoard();
+      moveList.push(uci); selected=null; turn=(turn==='w'?'b':'w'); updateEpTarget(moving,from,to); hintMove = null; renderBoard();
       if (currentGameId){ try{ const r=await fetch(`/game/${currentGameId}/move`,{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ uci }) }); if (!r.ok){ const err=await r.json().catch(()=>({})); boardArray=prevBoard; turn=prevTurn; moveList=prevMoves; selected=prevSelected; epTarget=prevEpTarget; renderBoard(); log(`[illegal] ${uci} (${err.error||r.status})`); return;} const jr=await r.json(); if (jr.over){ endGame({ result:jr.result, reason:jr.reason, pgn:jr.pgn }); return; } } catch(e){ boardArray=prevBoard; turn=prevTurn; moveList=prevMoves; selected=prevSelected; epTarget=prevEpTarget; renderBoard(); log(`[error] move not saved: ${e?.message||e}`); return; } }
       if (playAsSel.value !== turn) engineMove();
     }
 
-    async function applyEngineBestmove(uci){ if (!uci||uci.length<4) return; const from=parseSq(uci.slice(0,2)); const to=parseSq(uci.slice(2,4)); const promo=uci[4]||null; const moving=boardArray[from.r]?.[from.c]; if (!moving){ log(`[engine] ignored move: ${uci} (no piece at source)`); return; } const moved={...moving}; if (promo) moved.t=promo; boardArray[to.r][to.c]=moved; boardArray[from.r][from.c]=null; handleSpecialMoves(moving,from,to); moveList.push(uci); turn=(turn==='w'?'b':'w'); updateEpTarget(moving,from,to); renderBoard(); log(`[engine] ${uci}`);
+    async function applyEngineBestmove(uci){ if (!uci||uci.length<4) return; const from=parseSq(uci.slice(0,2)); const to=parseSq(uci.slice(2,4)); const promo=uci[4]||null; const moving=boardArray[from.r]?.[from.c]; if (!moving){ log(`[engine] ignored move: ${uci} (no piece at source)`); return; } const moved={...moving}; if (promo) moved.t=promo; boardArray[to.r][to.c]=moved; boardArray[from.r][from.c]=null; handleSpecialMoves(moving,from,to); moveList.push(uci); turn=(turn==='w'?'b':'w'); updateEpTarget(moving,from,to); hintMove = null; renderBoard(); log(`[engine] ${uci}`);
       if (currentGameId){ try{ const r=await fetch(`/game/${currentGameId}/move`,{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ uci }) }); if (!r.ok){ const err=await r.json().catch(()=>({})); log(`[engine persist error] ${uci} (${err.error||r.status})`); return; } const jr=await r.json(); if (jr.over){ endGame({ result:jr.result, reason:jr.reason, pgn:jr.pgn }); return; } } catch(e){ log(`[engine persist error] ${e?.message||e}`); } }
     }
 
@@ -1293,10 +1358,57 @@
       } catch(e){ setThinking(false); log('Failed to call /bestmove: '+(e?.message||e)); }
     }
 
+    async function requestHint() {
+      if (!started) return;
+      setThinking(true);
+
+      try {
+        // Similar to engineMove, but we won't APPLY the move
+        const depth = depthEl.value ? Number(depthEl.value) : null;
+        const diff  = Number(diffRange.value || 2);
+        const diffMs = [250, 500, 1000, 2000, 4000][diff - 1];
+
+        // For a hint, you can even cap this lower for snappier UX
+        const movetimeMs = depth ? Number(msEl.value || 500) : Math.min(diffMs, 1000);
+
+        const payload = {
+          moves: moveList,
+          movetimeMs,
+          depth: depth || null,
+          wtime: clocks.w,
+          btime: clocks.b,
+          winc: 0,
+          binc: 0
+        };
+
+        const r = await fetch('/bestmove', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await r.json();
+        setThinking(false, data.stats);
+
+        if (data.bestmove) {
+          hintMove = data.bestmove; // store but don't apply
+          renderBoard();
+          log(`[hint] suggested ${data.bestmove}`);
+        } else {
+          log(`[hint error]\n${data.raw || ''}`);
+        }
+      } catch (e) {
+        setThinking(false);
+        log('Failed to get hint: ' + (e?.message || e));
+      }
+    }
+
+
     document.getElementById('new').onclick = async ()=>{ try{ const r=await fetch('/game/new',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ time_control:'300+0' }) }); const g=await r.json(); currentGameId=g.gameId||null; } catch(_){ currentGameId=null; } startPosition(); whiteAtBottom=(playAsSel.value==='w'); renderBoard(); if (playAsSel.value==='b') engineMove(); };
     document.getElementById('flip').onclick = ()=>{ whiteAtBottom=!whiteAtBottom; renderBoard(); };
     document.getElementById('engineMove').onclick = ()=>{ if (started && playAsSel.value !== turn) engineMove(); };
     document.getElementById('finish').onclick = async ()=>{ if (!currentGameId){ log('No active game id.'); return; } try{ const r=await fetch(`/game/${currentGameId}/finish`,{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ result:'*' }) }); const data=await r.json(); if (data.pgn) log('Saved PGN:\n'+data.pgn); } catch(e){ log('Finish failed: '+(e?.message||e)); } };
+    document.getElementById('hintBtn').onclick = () => {if (!started) {log('Start a game to get a hint.'); return; } requestHint();};
     diffRange.addEventListener('input', ()=>{ diffLabel.textContent = `${diffRange.value}/5`; });
 
     // initial render
