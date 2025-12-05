@@ -16,20 +16,26 @@ let BOOK = {};
 try { BOOK = require("./book"); } catch { BOOK = {}; } // optional book
 const Database = require("better-sqlite3");
 
-
 // ---- config ----
 const PORT = Number(process.env.PORT || 8080);
 const HOST = "0.0.0.0";
 const DEFAULT_SITE = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
-// const ENGINE_PATH = path.join(__dirname, "engine", "chess_engine");
-const ENGINE_PATH = process.env.ENGINE_PATH || path.join(__dirname, "build", "chess_uci_bb");
 
-//const ENGINE_PATH = process.env.ENGINE_PATH || ""
+// Separate engines:
+// - PLAY_ENGINE_PATH : Ichigo (for playing games)
+// - ANALYSIS_ENGINE_PATH : Stockfish (for evals / puzzles)
+const PLAY_ENGINE_PATH =
+  process.env.PLAY_ENGINE_PATH ||
+  path.join(__dirname, "build", "chess_uci_bb");  // your Ichigo binary
+
+// Default ANALYSIS_ENGINE_PATH to PLAY_ENGINE_PATH if not set
+const ANALYSIS_ENGINE_PATH =
+  process.env.ANALYSIS_ENGINE_PATH ||
+  process.env.STOCKFISH_PATH ||    // optional alias
+  PLAY_ENGINE_PATH;
+
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
 
-
-// ensure data dir exists
-fs.mkdirSync(DATA_DIR, { recursive: true });
 
 /*
 // ---- DB init ----
@@ -106,29 +112,34 @@ app.use(express.static(path.join(__dirname, "public")));
 //   next();
 // });
 
-// ---- engine process (single-process MVP) ----
-const engine = spawn(ENGINE_PATH, [], { stdio: ["pipe", "pipe", "inherit"] });
-engine.on("error", (err) => console.error("[engine] spawn error:", err));
-engine.on("exit", (code, sig) => console.error(`[engine] exited (code=${code} sig=${sig})`));
+// ---- engine processes ----
+// Play engine: Ichigo
+const playEngine = spawn(PLAY_ENGINE_PATH, [], { stdio: ["pipe", "pipe", "inherit"] });
+playEngine.on("error", (err) => console.error("[play-engine] spawn error:", err));
+playEngine.on("exit", (code, sig) => console.error(`[play-engine] exited (code=${code} sig=${sig})`));
 
-// helper: run a small UCI exchange and wait for a pattern
-function uciExchange(lines, untilRegex) {
+// Analysis engine: Stockfish (or fallback to Ichigo)
+const analysisEngine = spawn(ANALYSIS_ENGINE_PATH, [], { stdio: ["pipe", "pipe", "inherit"] });
+analysisEngine.on("error", (err) => console.error("[analysis-engine] spawn error:", err));
+analysisEngine.on("exit", (code, sig) => console.error(`[analysis-engine] exited (code=${code} sig=${sig})`));
+
+// helper: run a small UCI exchange and wait for a pattern on a given engine
+function uciExchange(engineProc, lines, untilRegex) {
   return new Promise((resolve) => {
     let buf = "";
     const onData = (d) => {
       buf += d.toString();
       if (untilRegex.test(buf)) {
-        engine.stdout.off("data", onData);
+        engineProc.stdout.off("data", onData);
         resolve(buf);
       }
     };
-    engine.stdout.on("data", onData);
-    engine.stdin.write(lines.join("\n") + "\n");
+    engineProc.stdout.on("data", onData);
+    engineProc.stdin.write(lines.join("\n") + "\n");
   });
 }
 
 // ---- Engine eval helper: get cp & bestmove for a FEN ----
-// cp is Stockfish's "cp" score from the side to move (per UCI spec).
 async function evalPositionCp(fen, movetimeMs = 80) {
   const lines = [
     `position fen ${fen}`,
@@ -137,7 +148,7 @@ async function evalPositionCp(fen, movetimeMs = 80) {
   ];
   const until = /bestmove\s+\S+/;
 
-  const buf = await uciExchange(lines, until);
+  const buf = await uciExchange(analysisEngine, lines, until);
 
   const infos = buf.split(/\r?\n/).filter((l) => l.startsWith("info "));
   let evalCp = null;
@@ -160,6 +171,7 @@ async function evalPositionCp(fen, movetimeMs = 80) {
 
   return { evalCp, evalMate, bestmove };
 }
+
 
 // ---- Python RF scorer helper ----
 async function scorePuzzlesWithPython(puzzles) {
@@ -195,14 +207,22 @@ async function scorePuzzlesWithPython(puzzles) {
 }
 
 
-// init engine once at startup
+// init engines once at startup
 (async () => {
   try {
-    await uciExchange(["uci"], /uciok/);
-    await uciExchange(["isready"], /readyok/);
-    console.log("Engine ready.");
+    await uciExchange(playEngine, ["uci"], /uciok/);
+    await uciExchange(playEngine, ["isready"], /readyok/);
+    console.log("Play engine ready.");
   } catch (e) {
-    console.error("Engine failed to initialize:", e);
+    console.error("Play engine failed to initialize:", e);
+  }
+
+  try {
+    await uciExchange(analysisEngine, ["uci"], /uciok/);
+    await uciExchange(analysisEngine, ["isready"], /readyok/);
+    console.log("Analysis engine ready.");
+  } catch (e) {
+    console.error("Analysis engine failed to initialize:", e);
   }
 })();
 
@@ -316,16 +336,17 @@ app.post("/bestmove", async (req, res) => {
     };
 
     await new Promise((resolve) => {
-      const onData = (d) => {
-        buf += d.toString();
-        if (until.test(buf)) {
-          engine.stdout.off("data", onData);
-          resolve();
-        }
-      };
-      engine.stdout.on("data", onData);
-      engine.stdin.write([pos, "isready", goCmd].join("\n") + "\n");
-    });
+    const onData = (d) => {
+      buf += d.toString();
+      if (until.test(buf)) {
+        playEngine.stdout.off("data", onData);
+        resolve();
+      }
+    };
+    playEngine.stdout.on("data", onData);
+    playEngine.stdin.write([pos, "isready", goCmd].join("\n") + "\n");
+  });
+
 
     const m = buf.match(/bestmove\s+(\S+)/);
     const stats = parseStats();
@@ -480,7 +501,7 @@ function sanToUciArray(fen, sanString) {
   return uci;
 }
 
-/*
+
 // --- Chess.com daily puzzle (PGN-aware, with fallback) ---
 app.get("/puzzles/daily", async (_req, res) => {
   const fallback = {
@@ -631,8 +652,8 @@ app.get("/puzzles/random", async (_req, res) => {
     res.status(502).json({ error: "random puzzle fetch failed", detail: String(e) });
   }
 });
-*/
 
+/*
 // ---- Engine-generated puzzles: daily + random from SQLite ----
 
 // Fallback in case DB is empty (so UI always has *something* to show)
@@ -700,6 +721,7 @@ app.get("/puzzles/daily", (req, res) => {
     return res.status(500).json({ error: "daily puzzle failed" });
   }
 });
+*/
 
 // ---- ML-ranked random puzzle (sample from top band) ----
 app.get("/puzzles/random-ml", (req, res) => {
@@ -876,6 +898,26 @@ app.get("/game/:id.pgn", (req, res) => {
 });
 
 
+// HTTP endpoint: recent games (last N games, default 15)
+app.get("/chesscom/:username/games/recent", async (req, res) => {
+  try {
+    const limitRaw = req.query.limit;
+    const limit = Number.isFinite(Number(limitRaw))
+      ? Math.min(Math.max(Number(limitRaw), 1), 100)
+      : 15; // default 15
+
+    const data = await getRecentGames(req.params.username, limit);
+    res.json(data);
+  } catch (e) {
+    console.error("[/chesscom/:username/games/recent]", e);
+    if (e.status === 404) {
+      return res.status(404).json({ error: "user not found on chess.com" });
+    }
+    res.status(502).json({ error: "failed to load games from chess.com" });
+  }
+});
+
+
 function loadPgnCompat(game, pgn) {
   const text = String(pgn || "");
 
@@ -924,6 +966,8 @@ async function fetchJsonWithTimeout(url, { timeoutMs = 5000 } = {}) {
     clearTimeout(t);
   }
 }
+
+/*
 
 // === Chess.com recent month games ===
 async function getRecentMonthGames(usernameRaw) {
@@ -982,6 +1026,59 @@ app.get("/chesscom/:username/games/recent", async (req, res) => {
     res.status(502).json({ error: "failed to load games from chess.com" });
   }
 });
+*/
+
+// === Chess.com recent games (last N games across months) ===
+async function getRecentGames(usernameRaw, maxGames = 15) {
+  const username = String(usernameRaw || "").trim().toLowerCase();
+  if (!username) throw new Error("missing username");
+
+  const base = `https://api.chess.com/pub/player/${encodeURIComponent(username)}`;
+
+  // 1) Get list of archive URLs (monthly)
+  const archivesJson = await fetchJsonWithTimeout(`${base}/games/archives`);
+  const archives = Array.isArray(archivesJson.archives) ? archivesJson.archives : [];
+  if (!archives.length) {
+    return { username, archives: [], games: [] };
+  }
+
+  const games = [];
+
+  // 2) Walk archives from newest to oldest until we have maxGames
+  for (let i = archives.length - 1; i >= 0 && games.length < maxGames; i--) {
+    const monthUrl = archives[i];
+    const monthJson = await fetchJsonWithTimeout(monthUrl);
+    const rawGames = Array.isArray(monthJson.games) ? monthJson.games : [];
+    if (!rawGames.length) continue;
+
+    // 3) Walk this month's games from newest to oldest
+    for (let j = rawGames.length - 1; j >= 0 && games.length < maxGames; j--) {
+      const g = rawGames[j];
+
+      games.push({
+        id: games.length, // global index across months
+        url: g.url || null,
+        end_time: g.end_time || null,
+        time_control: g.time_control || null,
+        time_class: g.time_class || null,
+        rated: !!g.rated,
+        white: {
+          username: g.white?.username || null,
+          rating: g.white?.rating || null,
+          result: g.white?.result || null,
+        },
+        black: {
+          username: g.black?.username || null,
+          rating: g.black?.rating || null,
+          result: g.black?.result || null,
+        },
+        pgn: g.pgn || null,
+      });
+    }
+  }
+
+  return { username, archives, games };
+}
 
 /*
 function buildPuzzlesFromPGN({ pgn, username, maxPuzzles = 12 }) {
@@ -1050,7 +1147,12 @@ function buildPuzzlesFromPGN({ pgn, username, maxPuzzles = 12 }) {
 }
 */
 
-async function buildEvalPuzzlesFromPGN({ pgn, username, movetimeMs = 60, maxPuzzlesPerGame = 50 }) {
+async function buildEvalPuzzlesFromPGN({
+  pgn,
+  username,
+  movetimeMs = 60,
+  maxPuzzlesPerGame = 50,
+}) {
   const game = new Chess();
 
   const ok = loadPgnCompat(game, pgn);
@@ -1058,9 +1160,17 @@ async function buildEvalPuzzlesFromPGN({ pgn, username, movetimeMs = 60, maxPuzz
 
   let tags = {};
   if (typeof game.header === "function") {
-    try { tags = game.header() || {}; } catch { tags = {}; }
+    try {
+      tags = game.header() || {};
+    } catch {
+      tags = {};
+    }
   } else if (typeof game.getHeaders === "function") {
-    try { tags = game.getHeaders() || {}; } catch { tags = {}; }
+    try {
+      tags = game.getHeaders() || {};
+    } catch {
+      tags = {};
+    }
   }
 
   const uname = username ? String(username).toLowerCase() : null;
@@ -1110,7 +1220,6 @@ async function buildEvalPuzzlesFromPGN({ pgn, username, movetimeMs = 60, maxPuzz
   }
 
   const evaluated = [];
-  const BIG_GAP_CP = 120; // relax threshold: ~1.2 pawns instead of 2.0
 
   // Second: run engine evals and compute features
   for (const c of candidates) {
@@ -1123,8 +1232,10 @@ async function buildEvalPuzzlesFromPGN({ pgn, username, movetimeMs = 60, maxPuzz
 
       const mateToCp = (m) => (m == null ? null : (m > 0 ? 100000 : -100000));
 
-      const preCpRaw   = pre.evalCp != null ? pre.evalCp : mateToCp(pre.evalMate);
-      const afterCpRaw = aft.evalCp != null ? aft.evalCp : mateToCp(aft.evalMate);
+      const preCpRaw =
+        pre.evalCp != null ? pre.evalCp : mateToCp(pre.evalMate);
+      const afterCpRaw =
+        aft.evalCp != null ? aft.evalCp : mateToCp(aft.evalMate);
 
       if (preCpRaw == null || afterCpRaw == null) continue;
 
@@ -1135,11 +1246,10 @@ async function buildEvalPuzzlesFromPGN({ pgn, username, movetimeMs = 60, maxPuzz
       const played_eval_cp = -afterCpRaw;
 
       const eval_gap_cp = best_eval_cp - played_eval_cp;
-      const absGap = Math.abs(eval_gap_cp);
 
       const heuristic_difficulty = Math.max(
         0,
-        Math.min(4000, absGap + Math.max(0, best_eval_cp))
+        Math.min(4000, Math.abs(eval_gap_cp) + Math.max(0, best_eval_cp))
       );
 
       const is_mate = pre.evalMate != null ? 1 : 0;
@@ -1170,19 +1280,20 @@ async function buildEvalPuzzlesFromPGN({ pgn, username, movetimeMs = 60, maxPuzz
 
   if (!evaluated.length) return [];
 
-  // 1) Prefer big eval gaps
+  const BIG_GAP_CP = 120; // ~1.2 pawns
+
+  // Only keep genuinely "big blunder" positions
   let filtered = evaluated.filter(
     (p) => p.eval_gap_cp != null && p.eval_gap_cp >= BIG_GAP_CP
   );
 
-  // 2) If that wipes everything out, fall back to "top by gap"
-  if (!filtered.length) {
-    filtered = [...evaluated].sort(
-      (a, b) => (b.eval_gap_cp || 0) - (a.eval_gap_cp || 0)
-    );
-  }
+  console.log(
+    `[from-user] game ${tags.Event || ""}: filtered=${filtered.length} (gap >= ${BIG_GAP_CP})`
+  );
 
-  // 3) Per-game cap
+  // If no positions pass the threshold, this game simply contributes 0 puzzles
+  if (!filtered.length) return [];
+
   if (filtered.length > maxPuzzlesPerGame) {
     filtered = filtered.slice(0, maxPuzzlesPerGame);
   }
@@ -1190,11 +1301,18 @@ async function buildEvalPuzzlesFromPGN({ pgn, username, movetimeMs = 60, maxPuzz
   return filtered;
 }
 
-async function buildUserRecentPuzzlesML({ username, maxGames = 15, maxPuzzles = 200, movetimeMs = 60 }) {
-  const data = await getRecentMonthGames(username);
+
+async function buildUserRecentPuzzlesML({
+  username,
+  maxGames = 15,
+  maxPuzzles = 200,
+  movetimeMs = 60,
+}) {
+  const data = await getRecentGames(username, maxGames);
   const games = Array.isArray(data.games) ? data.games : [];
   if (!games.length) return [];
 
+  // Newest first, only games with PGN
   const sorted = games
     .filter((g) => g && g.pgn)
     .sort((a, b) => (b.end_time || 0) - (a.end_time || 0));
@@ -1202,6 +1320,7 @@ async function buildUserRecentPuzzlesML({ username, maxGames = 15, maxPuzzles = 
   const selected = sorted.slice(0, maxGames);
 
   const allPuzzles = [];
+
   for (const g of selected) {
     try {
       const puzzles = await buildEvalPuzzlesFromPGN({
@@ -1232,22 +1351,33 @@ async function buildUserRecentPuzzlesML({ username, maxGames = 15, maxPuzzles = 
 
   if (!allPuzzles.length) return [];
 
+  // === ML scoring via Python script ===
   let scored;
   try {
     scored = await scorePuzzlesWithPython(allPuzzles);
   } catch (e) {
-    console.error("[from-user ML] scoring failed:", e);
-    scored = allPuzzles.map((p) => ({ ...p, ml_score: p.eval_gap_cp || 0 }));
+    console.error("[from-user ML] scoring failed, falling back to eval_gap_cp:", e);
+    scored = allPuzzles.map((p) => ({ ...p, ml_score: p.eval_gap_cp }));
   }
 
-  scored.sort((a, b) => (b.ml_score || 0) - (a.ml_score || 0));
+  const THRESH = 0.5; // tune this if needed
+  let mlPuzzles = scored.filter(
+    (p) => p.ml_score != null && p.ml_score >= THRESH
+  );
 
-  if (scored.length > maxPuzzles) {
-    return scored.slice(0, maxPuzzles);
+  console.log(
+    `[from-user] ML accepted ${mlPuzzles.length} / ${scored.length} candidates (threshold=${THRESH})`
+  );
+
+  // Sort best to worst and cap
+  mlPuzzles.sort((a, b) => (b.ml_score || 0) - (a.ml_score || 0));
+  if (mlPuzzles.length > maxPuzzles) {
+    mlPuzzles = mlPuzzles.slice(0, maxPuzzles);
   }
 
-  return scored;
+  return mlPuzzles;
 }
+
 
 // Build puzzles from PGN using engine eval + ML-ish features
 async function buildPuzzlesFromPGNWithEval({ pgn, username, maxPuzzles = 12, movetimeMs = 80 }) {
@@ -1480,11 +1610,12 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// ---- graceful shutdown ----
 function shutdown() {
-  try { engine.kill("SIGTERM"); } catch {}
+  try { playEngine.kill("SIGTERM"); } catch {}
+  try { analysisEngine.kill("SIGTERM"); } catch {}
   process.exit(0);
 }
+
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 

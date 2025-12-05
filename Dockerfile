@@ -33,7 +33,8 @@ RUN chmod +x /app/engine/chess_uci_bb
 # env
 ENV NODE_ENV=production
 ENV PORT=8080
-ENV ENGINE_PATH=/app/engine/chess_uci_bb
+ENV PLAY_ENGINE_PATH=/app/engine/chess_uci_bb
+ENV ANALYSIS_ENGINE_PATH=/usr/bin/stockfish
 ENV DATA_DIR=/app/data
 
 EXPOSE 8080
