@@ -620,36 +620,37 @@
           Solution (UCI): <span class="mono" id="solutionRaw">—</span>
         </div>
       </section>
-
-      <!-- Right: From your games + instructions -->
+            <!-- Right: From your games + instructions -->
       <aside class="side-panel">
         <section class="side-card">
           <div class="side-card-header">
             <div class="side-card-title">From your Chess.com games</div>
             <span id="gamesStatus"></span>
           </div>
+
           <div class="side-card-small-list">
             <div style="display:flex; gap:0.5rem; align-items:center;">
-              <input id="usernameInput" type="text" placeholder="Chess.com username (e.g. cahxree)" autocomplete="off" />
+              <input id="usernameInput" type="text" placeholder="Chess.com username (e.g. Hikaru)" autocomplete="off" />
               <button class="btn btn-primary" id="btnLoadGames" style="font-size:0.8rem; padding:0.3rem 0.8rem;">
                 Load games
               </button>
             </div>
 
             <div class="muted" style="font-size:0.8rem; margin-top:0.25rem;">
-              1) Enter your Chess.com username and press <strong>Load games</strong>.
-              Ichigo will fetch your most recent games.
+              1) Enter your Chess.com username and tap <strong>Load games</strong>.
+              Ichigo will fetch your most recent games automatically.
             </div>
 
             <div class="muted" style="font-size:0.8rem;">
-              2) While the list loads, the server runs Stockfish and a small ML model
-              over those games to find your <strong>most instructive mistakes</strong>.
-              The top ML-ranked puzzle is loaded on the board automatically.
+              2) While your games load, Ichigo:
+              <br> &nbsp;• Analyzes every move with Stockfish
+              <br> &nbsp;• Spots moments where you missed the best move
+              <br> &nbsp;• Scores each moment and loads your <strong>top-ranked tactic</strong>
             </div>
 
             <div class="muted" style="font-size:0.8rem;">
-              3) Click a specific game in the list to generate one-move puzzles just from that game.
-              Use the ◀ / ▶ buttons under the board to cycle through the positions.
+              3) Click any game in the list to generate puzzles from that specific game.
+              Use the ◀ / ▶ buttons under the board to cycle through each position.
             </div>
 
             <div id="gamesList" style="max-height:260px; overflow:auto; margin-top:0.35rem;"></div>
@@ -662,33 +663,32 @@
           </div>
           <div class="side-card-small-list">
             <div class="muted">
-              • <strong>Daily</strong> pulls today’s featured puzzle from Chess.com and converts it into an interactive board.
+              • <strong>Daily</strong> pulls today’s featured puzzle from Chess.com and loads it as an interactive board.
             </div>
             <div class="muted">
-              • <strong>Random</strong> grabs a fresh tactical puzzle from Chess.com each time you click.
+              • <strong>Random</strong> fetches a fresh tactical puzzle from Chess.com each time you click.
             </div>
             <div class="muted">
-              • <strong>From your games</strong>:
-              when you load your Chess.com username, Ichigo:
-              <br> &nbsp;– downloads your last 15 games,
-              <br> &nbsp;– runs Stockfish at each candidate move,
-              <br> &nbsp;– uses a trained ML model to rank positions where you deviated from the engine,
-              <br> &nbsp;– and drops the <strong>highest-priority puzzle</strong> straight onto the board.
+              • <strong>From your games</strong>: when you load your username, Ichigo:
+              <br> &nbsp;– Downloads your last 15 games  
+              <br> &nbsp;– Evaluates each move 
+              <br> &nbsp;– Ranks mistakes  
+              <br> &nbsp;– Surfaces the <strong>most instructive tactic</strong> for immediate training
             </div>
             <div class="muted">
-              • Click on the board squares to play moves. If you miss the tactic,
-              you’ll see an instant “Incorrect” message and can try again.
+              • Click the board to play your move. If it's wrong, Ichigo shows an instant “Incorrect” message.
             </div>
             <div class="muted">
-              • Use <strong>Reset</strong>, <strong>Flip</strong>, and the <strong>view mode</strong> dropdown to make
-              the position easier to visualize from your side of the board.
+              • Use <strong>Reset</strong>, <strong>Flip</strong>, and <strong>View Mode</strong> to control how the position is displayed.
             </div>
             <div class="muted">
-              • <strong>Step</strong> plays the next move in the solution; <strong>Auto</strong> plays all moves for quick review.
+              • <strong>Step</strong> plays the next move in the solution; <strong>Auto</strong> plays the entire line for quick review.
             </div>
           </div>
         </section>
       </aside>
+
+
     </div>
   </main>
 
@@ -1266,8 +1266,8 @@
       if (pz.ml_score != null) {
         // ML-ranked across last 15 games
         labId.textContent = `Puzzle ${i + 1} of ${total}`;
-        labRating.textContent = 'From your games · ML-ranked';
-        themesEl.textContent = 'from your games · ML';
+        labRating.textContent = 'From your games';
+        themesEl.textContent = 'from your games';
       } else {
         // Legacy / per-game puzzles
         const moveNo = pz.moveNumber || pz.ply || (i + 1);

@@ -1,0 +1,13 @@
+[Event "Sample Game 1"]
+[Site "Ichigo"]
+[Date "2025.12.02"]
+[Round "1"]
+[White "White"]
+[Black "Black"]
+[Result "1-0"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. b4 Bxb4 5. c3 Ba5 6. d4 exd4 7. O-O dxc3
+8. Qb3 Qf6 9. e5 Nxe5 10. Re1 d6 11. Qb5+ c6 12. Qxa5 Be6 13. Nxe5 dxe5
+14. Nxc3 Bxc4 15. Rxe5+ Kd7 16. Bg5 Qd6 17. Rd1 Bd5 18. Nxd5 Qxe5
+19. Nb6+ Ke6 20. Re1 Qxe1+ 21. Qxe1+ Kf5 22. Nxa8 Kxg5 23. Qe5+ Kg6
+24. g4 f6 25. Qh5# 1-0
