@@ -4,6 +4,8 @@ const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const rateLimit = require("express-rate-limit");
+const crypto = require("crypto");
+
 
 
 const chessjs = require("chess.js");
@@ -29,6 +31,7 @@ const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
 // ensure data dir exists
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
+/*
 // ---- DB init ----
 const DB = new Database(path.join(DATA_DIR, "app.db"));
 DB.pragma("journal_mode = WAL");
@@ -42,10 +45,42 @@ CREATE TABLE IF NOT EXISTS games (
   time_control TEXT DEFAULT '5+0'
 );
 `);
+*/
+
+// ---- DB init ----
+const DB = new Database(path.join(DATA_DIR, "app.db"));
+DB.pragma("journal_mode = WAL");
+DB.exec(`
+CREATE TABLE IF NOT EXISTS games (
+  id INTEGER PRIMARY KEY,
+  created_at TEXT DEFAULT (datetime('now')),
+  result TEXT DEFAULT '*',
+  moves TEXT DEFAULT '',
+  pgn   TEXT,
+  time_control TEXT DEFAULT '5+0'
+);
+
+CREATE TABLE IF NOT EXISTS puzzles (
+  id INTEGER PRIMARY KEY,
+  fen TEXT NOT NULL,
+  side_to_move TEXT NOT NULL,           -- 'w' or 'b'
+  solution_moves TEXT NOT NULL,         -- JSON array of UCI moves
+  pre_eval_cp INTEGER NOT NULL,         -- eval before best move (centipawns)
+  best_eval_cp INTEGER NOT NULL,        -- eval after best move
+  played_eval_cp INTEGER NOT NULL,      -- eval after played move in original game
+  eval_gap_cp INTEGER NOT NULL,         -- best_eval_cp - played_eval_cp
+  heuristic_difficulty REAL NOT NULL,   -- your handcrafted difficulty score
+  is_mate INTEGER NOT NULL DEFAULT 0,   -- 1 if engine reports mate line
+  source_game TEXT,                     -- e.g. "selfplay-001#23" or PGN tag
+  created_at TEXT DEFAULT (datetime('now'))
+);
+`);
+
 function gameById(id){
   return DB.prepare(`SELECT id, created_at, result, moves, pgn, time_control
                      FROM games WHERE id=?`).get(id);
 }
+
 
 const fetch = (...args) => import('node-fetch').then(({default: f}) => f(...args));
 
@@ -92,6 +127,74 @@ function uciExchange(lines, untilRegex) {
   });
 }
 
+// ---- Engine eval helper: get cp & bestmove for a FEN ----
+// cp is Stockfish's "cp" score from the side to move (per UCI spec).
+async function evalPositionCp(fen, movetimeMs = 80) {
+  const lines = [
+    `position fen ${fen}`,
+    "isready",
+    `go movetime ${movetimeMs}`,
+  ];
+  const until = /bestmove\s+\S+/;
+
+  const buf = await uciExchange(lines, until);
+
+  const infos = buf.split(/\r?\n/).filter((l) => l.startsWith("info "));
+  let evalCp = null;
+  let evalMate = null;
+  let bestmove = null;
+
+  if (infos.length) {
+    const last = infos[infos.length - 1];
+    const takeNum = (re) => {
+      const m = last.match(re);
+      return m ? Number(m[1]) : null;
+    };
+
+    evalMate = takeNum(/\bscore\s+mate\s+(-?\d+)/);
+    evalCp   = takeNum(/\bscore\s+cp\s+(-?\d+)/);
+  }
+
+  const m = buf.match(/bestmove\s+(\S+)/);
+  if (m) bestmove = m[1];
+
+  return { evalCp, evalMate, bestmove };
+}
+
+// ---- Python RF scorer helper ----
+async function scorePuzzlesWithPython(puzzles) {
+  return new Promise((resolve, reject) => {
+    const scriptPath = path.join(__dirname, "scripts", "score_puzzles_ad_hoc.py");
+
+    const proc = spawn("python", [scriptPath], {
+      stdio: ["pipe", "pipe", "inherit"], // stdin, stdout, stderr->server stderr
+    });
+
+    let out = "";
+    proc.stdout.on("data", (d) => {
+      out += d.toString();
+    });
+
+    proc.on("error", (err) => reject(err));
+
+    proc.on("close", (code) => {
+      if (code !== 0) {
+        return reject(new Error(`score_puzzles_ad_hoc.py exited with code ${code}`));
+      }
+      try {
+        const parsed = JSON.parse(out);
+        resolve(parsed);
+      } catch (e) {
+        reject(e);
+      }
+    });
+
+    proc.stdin.write(JSON.stringify(puzzles));
+    proc.stdin.end();
+  });
+}
+
+
 // init engine once at startup
 (async () => {
   try {
@@ -102,6 +205,8 @@ function uciExchange(lines, untilRegex) {
     console.error("Engine failed to initialize:", e);
   }
 })();
+
+ 
 
 // ---- health ----
 app.get("/ping", (_req, res) => res.type("text").send("pong"));
@@ -255,6 +360,31 @@ function uciListToPgn({ movesUci = [], headers = {}, result = "*" }) {
   return game.pgn({ maxWidth: 80, newline: "\n" });
 }
 
+function puzzleRowToJson(row) {
+  let moves;
+  try {
+    moves = JSON.parse(row.solution_moves || "[]");
+  } catch {
+    moves = [];
+  }
+
+  const themes = [
+    "engine-generated",
+    row.is_mate ? "mate" : "tactic",
+  ];
+  if (row.source_game) themes.push("from-self-play");
+
+  return {
+    id: row.id,
+    fen: row.fen,
+    moves,                                  // UCI array – what puzzles.html expects
+    rating: row.heuristic_difficulty ? Math.round(row.heuristic_difficulty) : null,
+    themes,
+  };
+}
+
+
+
 app.post("/pgn", (req, res) => {
   try {
     const { moves = [], headers = {}, result = "*" } = req.body || {};
@@ -350,6 +480,7 @@ function sanToUciArray(fen, sanString) {
   return uci;
 }
 
+/*
 // --- Chess.com daily puzzle (PGN-aware, with fallback) ---
 app.get("/puzzles/daily", async (_req, res) => {
   const fallback = {
@@ -500,7 +631,140 @@ app.get("/puzzles/random", async (_req, res) => {
     res.status(502).json({ error: "random puzzle fetch failed", detail: String(e) });
   }
 });
+*/
 
+// ---- Engine-generated puzzles: daily + random from SQLite ----
+
+// Fallback in case DB is empty (so UI always has *something* to show)
+const FALLBACK_PUZZLE = {
+  id: "fallback-queen-mate",
+  source: "fallback",
+  fen: "7k/5Q2/7K/8/8/8/8/8 w - - 0 1",
+  moves: ["f7g7"], // Qg7#
+  rating: 1200,
+  themes: ["mateIn1","basic"],
+};
+
+app.get("/puzzles/random", (req, res) => {
+  try {
+    const row = DB.prepare(`
+      SELECT *
+      FROM puzzles
+      ORDER BY RANDOM()
+      LIMIT 1
+    `).get();
+
+    if (!row) {
+      // No engine puzzles yet → use fallback so UI doesn't break
+      return res.json(FALLBACK_PUZZLE);
+    }
+
+    return res.json(puzzleRowToJson(row));
+  } catch (e) {
+    console.error("[/puzzles/random] error:", e);
+    return res.status(500).json({ error: "random puzzle failed" });
+  }
+});
+
+app.get("/puzzles/daily", (req, res) => {
+  try {
+    const countRow = DB.prepare("SELECT COUNT(*) AS n FROM puzzles").get();
+    const n = countRow?.n || 0;
+
+    if (!n) {
+      // still no local puzzles – same fallback
+      return res.json(FALLBACK_PUZZLE);
+    }
+
+    // Deterministic "daily" selection based on date
+    const today = new Date();
+    const key = `${today.getUTCFullYear()}-${today.getUTCMonth()+1}-${today.getUTCDate()}`;
+
+    const hash = crypto.createHash("md5").update(key).digest();
+    const index = hash.readUInt32BE(0) % n;
+
+    const row = DB.prepare(`
+      SELECT *
+      FROM puzzles
+      ORDER BY id
+      LIMIT 1 OFFSET ?
+    `).get(index);
+
+    if (!row) {
+      return res.json(FALLBACK_PUZZLE);
+    }
+
+    return res.json(puzzleRowToJson(row));
+  } catch (e) {
+    console.error("[/puzzles/daily] error:", e);
+    return res.status(500).json({ error: "daily puzzle failed" });
+  }
+});
+
+// ---- ML-ranked random puzzle (sample from top band) ----
+app.get("/puzzles/random-ml", (req, res) => {
+  try {
+    // 1) Grab a band of "good enough" puzzles
+    const rows = DB.prepare(`
+      SELECT
+        id,
+        fen,
+        side_to_move,
+        solution_moves,
+        heuristic_difficulty,
+        ml_score,
+        source_game
+      FROM puzzles
+      WHERE ml_score IS NOT NULL
+        AND ml_score >= 0.7         -- adjust this threshold if you like
+      ORDER BY ml_score DESC
+      LIMIT 100                     -- cap how many we consider
+    `).all();
+
+    if (!rows.length) {
+      return res.status(404).json({ error: "no ML-scored puzzles available in band" });
+    }
+
+    // 2) Pick one uniformly at random from this band
+    const picked = rows[Math.floor(Math.random() * rows.length)];
+
+    // 3) Robustly parse solution_moves (JSON or whitespace)
+    let movesRaw = picked.solution_moves || "";
+    let moves = [];
+
+    try {
+      const trimmed = String(movesRaw).trim();
+      if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+        moves = JSON.parse(trimmed);
+      } else {
+        moves = trimmed.split(/\s+/).filter(Boolean);
+      }
+    } catch (e) {
+      console.error("[/puzzles/random-ml] parse solution_moves failed:", e);
+      moves = String(movesRaw).trim().split(/\s+/).filter(Boolean);
+    }
+
+    if (!Array.isArray(moves)) moves = [];
+    moves = moves.map(m => String(m).trim().toLowerCase()).filter(Boolean);
+
+    if (!moves.length) {
+      return res.status(500).json({ error: "ml puzzle has no moves" });
+    }
+
+    res.json({
+      id: picked.id,
+      fen: picked.fen,
+      moves,
+      rating: picked.heuristic_difficulty || null,
+      themes: ["ml-ranked"],
+      source: picked.source_game || "ml",
+      ml_score: picked.ml_score,
+    });
+  } catch (e) {
+    console.error("[/puzzles/random-ml] error:", e);
+    res.status(500).json({ error: "ml-random failed" });
+  }
+});
 
 
 app.post("/game/:id/move", (req, res) => {
@@ -719,6 +983,7 @@ app.get("/chesscom/:username/games/recent", async (req, res) => {
   }
 });
 
+/*
 function buildPuzzlesFromPGN({ pgn, username, maxPuzzles = 12 }) {
   const game = new Chess();
 
@@ -783,7 +1048,352 @@ function buildPuzzlesFromPGN({ pgn, username, maxPuzzles = 12 }) {
 
   return puzzles;
 }
+*/
 
+async function buildEvalPuzzlesFromPGN({ pgn, username, movetimeMs = 60, maxPuzzlesPerGame = 50 }) {
+  const game = new Chess();
+
+  const ok = loadPgnCompat(game, pgn);
+  if (!ok) throw new Error("bad PGN");
+
+  let tags = {};
+  if (typeof game.header === "function") {
+    try { tags = game.header() || {}; } catch { tags = {}; }
+  } else if (typeof game.getHeaders === "function") {
+    try { tags = game.getHeaders() || {}; } catch { tags = {}; }
+  }
+
+  const uname = username ? String(username).toLowerCase() : null;
+  let focusColor = "w";
+  if (uname) {
+    if ((tags.White || "").toLowerCase() === uname) focusColor = "w";
+    else if ((tags.Black || "").toLowerCase() === uname) focusColor = "b";
+  }
+
+  const verboseMoves = game.history({ verbose: true });
+  const replay = new Chess();
+
+  const candidates = [];
+
+  // First: collect candidate moves (sideToMove == focusColor)
+  for (let i = 0; i < verboseMoves.length; i++) {
+    const moveObj = verboseMoves[i];
+    const sideToMove = replay.turn();
+    const fenBefore = replay.fen();
+
+    const playedUci =
+      moveObj.from +
+      moveObj.to +
+      (moveObj.promotion ? moveObj.promotion : "");
+
+    const ply = i + 1;
+    const fullMoveNumber = Math.floor(i / 2) + 1;
+
+    if (sideToMove === focusColor) {
+      const tmp = new Chess(fenBefore);
+      tmp.move(moveObj);
+      const fenAfterPlayed = tmp.fen();
+
+      candidates.push({
+        gameTag: tags.Event || null,
+        fen: fenBefore,
+        fenAfterPlayed,
+        sideToMove,
+        uci: playedUci,
+        san: moveObj.san,
+        ply,
+        moveNumber: fullMoveNumber,
+      });
+    }
+
+    replay.move(moveObj);
+  }
+
+  const evaluated = [];
+  const BIG_GAP_CP = 120; // relax threshold: ~1.2 pawns instead of 2.0
+
+  // Second: run engine evals and compute features
+  for (const c of candidates) {
+    try {
+      const pre = await evalPositionCp(c.fen, movetimeMs);
+      if (pre.evalCp == null && pre.evalMate == null) continue;
+
+      const aft = await evalPositionCp(c.fenAfterPlayed, movetimeMs);
+      if (aft.evalCp == null && aft.evalMate == null) continue;
+
+      const mateToCp = (m) => (m == null ? null : (m > 0 ? 100000 : -100000));
+
+      const preCpRaw   = pre.evalCp != null ? pre.evalCp : mateToCp(pre.evalMate);
+      const afterCpRaw = aft.evalCp != null ? aft.evalCp : mateToCp(aft.evalMate);
+
+      if (preCpRaw == null || afterCpRaw == null) continue;
+
+      const pre_eval_cp = preCpRaw;
+      const best_eval_cp = pre_eval_cp;
+
+      // after position: opponent to move; flip sign to keep hero POV
+      const played_eval_cp = -afterCpRaw;
+
+      const eval_gap_cp = best_eval_cp - played_eval_cp;
+      const absGap = Math.abs(eval_gap_cp);
+
+      const heuristic_difficulty = Math.max(
+        0,
+        Math.min(4000, absGap + Math.max(0, best_eval_cp))
+      );
+
+      const is_mate = pre.evalMate != null ? 1 : 0;
+
+      evaluated.push({
+        fen: c.fen,
+        sideToMove: c.sideToMove,
+        uci: c.uci,
+        san: c.san,
+        ply: c.ply,
+        moveNumber: c.moveNumber,
+        source_event: c.gameTag,
+        pre_eval_cp,
+        best_eval_cp,
+        played_eval_cp,
+        eval_gap_cp,
+        heuristic_difficulty,
+        is_mate,
+      });
+    } catch (e) {
+      console.error("[from-user eval] failed for ply", c.ply, e);
+    }
+  }
+
+  console.log(
+    `[from-user] game ${tags.Event || ""}: candidates=${candidates.length}, evaluated=${evaluated.length}`
+  );
+
+  if (!evaluated.length) return [];
+
+  // 1) Prefer big eval gaps
+  let filtered = evaluated.filter(
+    (p) => p.eval_gap_cp != null && p.eval_gap_cp >= BIG_GAP_CP
+  );
+
+  // 2) If that wipes everything out, fall back to "top by gap"
+  if (!filtered.length) {
+    filtered = [...evaluated].sort(
+      (a, b) => (b.eval_gap_cp || 0) - (a.eval_gap_cp || 0)
+    );
+  }
+
+  // 3) Per-game cap
+  if (filtered.length > maxPuzzlesPerGame) {
+    filtered = filtered.slice(0, maxPuzzlesPerGame);
+  }
+
+  return filtered;
+}
+
+async function buildUserRecentPuzzlesML({ username, maxGames = 15, maxPuzzles = 200, movetimeMs = 60 }) {
+  const data = await getRecentMonthGames(username);
+  const games = Array.isArray(data.games) ? data.games : [];
+  if (!games.length) return [];
+
+  const sorted = games
+    .filter((g) => g && g.pgn)
+    .sort((a, b) => (b.end_time || 0) - (a.end_time || 0));
+
+  const selected = sorted.slice(0, maxGames);
+
+  const allPuzzles = [];
+  for (const g of selected) {
+    try {
+      const puzzles = await buildEvalPuzzlesFromPGN({
+        pgn: g.pgn,
+        username,
+        movetimeMs,
+        maxPuzzlesPerGame: 50,
+      });
+
+      console.log(
+        `[from-user] game id=${g.id}, got ${puzzles.length} puzzles`
+      );
+
+      for (const p of puzzles) {
+        p.source_game_id = g.id;
+        p.time_control   = g.time_control || null;
+        p.time_class     = g.time_class || null;
+        p.rated          = !!g.rated;
+      }
+
+      allPuzzles.push(...puzzles);
+    } catch (e) {
+      console.error("[from-user] failed on game", g.id, e);
+    }
+  }
+
+  console.log(`[from-user] total puzzles before ML: ${allPuzzles.length}`);
+
+  if (!allPuzzles.length) return [];
+
+  let scored;
+  try {
+    scored = await scorePuzzlesWithPython(allPuzzles);
+  } catch (e) {
+    console.error("[from-user ML] scoring failed:", e);
+    scored = allPuzzles.map((p) => ({ ...p, ml_score: p.eval_gap_cp || 0 }));
+  }
+
+  scored.sort((a, b) => (b.ml_score || 0) - (a.ml_score || 0));
+
+  if (scored.length > maxPuzzles) {
+    return scored.slice(0, maxPuzzles);
+  }
+
+  return scored;
+}
+
+// Build puzzles from PGN using engine eval + ML-ish features
+async function buildPuzzlesFromPGNWithEval({ pgn, username, maxPuzzles = 12, movetimeMs = 80 }) {
+  const game = new Chess();
+
+  const ok = loadPgnCompat(game, pgn);
+  if (!ok) throw new Error("bad PGN");
+
+  let tags = {};
+  if (typeof game.header === "function") {
+    try { tags = game.header() || {}; } catch { tags = {}; }
+  } else if (typeof game.getHeaders === "function") {
+    try { tags = game.getHeaders() || {}; } catch { tags = {}; }
+  }
+
+  const uname = username ? String(username).toLowerCase() : null;
+  let focusColor = "w";
+  if (uname) {
+    if ((tags.White || "").toLowerCase() === uname) focusColor = "w";
+    else if ((tags.Black || "").toLowerCase() === uname) focusColor = "b";
+  }
+
+  const verboseMoves = game.history({ verbose: true });
+  const replay = new Chess();
+
+  // First pass: collect candidate positions (just structure)
+  const candidates = [];
+
+  for (let i = 0; i < verboseMoves.length; i++) {
+    const moveObj = verboseMoves[i];
+    const sideToMove = replay.turn(); // side about to play this move
+    const fenBefore = replay.fen();
+
+    const playedUci =
+      moveObj.from +
+      moveObj.to +
+      (moveObj.promotion ? moveObj.promotion : "");
+
+    const ply = i + 1;
+    const fullMoveNumber = Math.floor(i / 2) + 1;
+
+    if (sideToMove === focusColor) {
+      // Compute FEN after the actually played move
+      const tmp = new Chess(fenBefore);
+      tmp.move(moveObj);
+      const fenAfterPlayed = tmp.fen();
+
+      candidates.push({
+        id: i,
+        fen: fenBefore,
+        sideToMove,
+        uci: playedUci,
+        san: moveObj.san,
+        ply,
+        moveNumber: fullMoveNumber,
+        fenAfterPlayed,
+      });
+    }
+
+    replay.move(moveObj);
+  }
+
+  // Second pass: engine eval for each candidate
+  const evaluated = [];
+  for (const c of candidates) {
+    try {
+      // Eval of position before move (sideToMove POV)
+      const pre = await evalPositionCp(c.fen, movetimeMs);
+      if (pre.evalCp == null && pre.evalMate == null) continue;
+
+      // Eval of position after the played move (opponent to move POV)
+      const aft = await evalPositionCp(c.fenAfterPlayed, movetimeMs);
+      if (aft.evalCp == null && aft.evalMate == null) continue;
+
+      // Convert "mate" to large cp value if needed
+      const mateToCp = (m) => (m == null ? null : (m > 0 ? 100000 : -100000));
+
+      const preCpRaw   = pre.evalCp != null ? pre.evalCp : mateToCp(pre.evalMate);
+      const afterCpRaw = aft.evalCp != null ? aft.evalCp : mateToCp(aft.evalMate);
+
+      if (preCpRaw == null || afterCpRaw == null) continue;
+
+      // pre_eval_cp: eval before move from side-to-move's POV (UCI cp already does this)
+      const pre_eval_cp = preCpRaw;
+
+      // best_eval_cp: "what if I play best" — we approximate using pre_eval_cp
+      const best_eval_cp = pre_eval_cp;
+
+      // played_eval_cp: eval after played move, from the same player's POV
+      // After the move, it's opponent's turn; UCI cp is from opponent's POV,
+      // so flip the sign to keep it "hero's" perspective.
+      const played_eval_cp = -afterCpRaw;
+
+      const eval_gap_cp = best_eval_cp - played_eval_cp;
+      const absGap = Math.abs(eval_gap_cp);
+
+      // Simple difficulty heuristic (similar scale to offline):
+      const heuristic_difficulty = Math.max(
+        0,
+        Math.min(4000, absGap + Math.max(0, best_eval_cp))
+      );
+
+      const is_mate = pre.evalMate != null ? 1 : 0;
+
+      evaluated.push({
+        id: c.id,
+        fen: c.fen,
+        sideToMove: c.sideToMove,
+        uci: c.uci,
+        san: c.san,
+        ply: c.ply,
+        moveNumber: c.moveNumber,
+        pre_eval_cp,
+        best_eval_cp,
+        played_eval_cp,
+        eval_gap_cp,
+        heuristic_difficulty,
+        is_mate,
+      });
+    } catch (e) {
+      console.error("[from-game eval] failed for ply", c.ply, e);
+    }
+  }
+
+  // Filter for "interesting" tactics before ML (big gap)
+  const filtered = evaluated.filter((p) => p.eval_gap_cp != null && p.eval_gap_cp >= 150);
+
+  if (!filtered.length) return [];
+
+  // Third pass: send to Python RF model for ml_score
+  let scored;
+  try {
+    scored = await scorePuzzlesWithPython(filtered);
+  } catch (e) {
+    console.error("[from-game ML] scoring failed:", e);
+    // Fall back to just using eval_gap_cp as score
+    scored = filtered.map((p) => ({ ...p, ml_score: p.eval_gap_cp }));
+  }
+
+  // Sort by ml_score desc and keep up to maxPuzzles
+  scored.sort((a, b) => (b.ml_score || 0) - (a.ml_score || 0));
+
+  return scored.slice(0, maxPuzzles);
+}
+
+/*
 // HTTP endpoint: build puzzles from a single game PGN
 app.post("/puzzles/from-game", (req, res) => {
   try {
@@ -806,8 +1416,64 @@ app.post("/puzzles/from-game", (req, res) => {
     res.status(500).json({ ok: false, error: "puzzle generation failed" });
   }
 });
+*/
+// HTTP endpoint: build ML-ranked puzzles from a single game PGN
+app.post("/puzzles/from-game", async (req, res) => {
+  try {
+    const { pgn, username, maxPuzzles } = req.body || {};
+    if (!pgn) return res.status(400).json({ error: "missing pgn" });
 
+    const max = Number.isFinite(Number(maxPuzzles))
+      ? Math.min(Math.max(Number(maxPuzzles), 1), 50)
+      : 12;
 
+    const puzzles = await buildPuzzlesFromPGNWithEval({
+      pgn,
+      username,
+      maxPuzzles: max,
+      movetimeMs: 80, // tweak if too slow/fast
+    });
+
+    res.json({
+      ok: true,
+      count: puzzles.length,
+      puzzles,
+    });
+  } catch (e) {
+    console.error("[/puzzles/from-game] error:", e);
+    res.status(500).json({ ok: false, error: "puzzle generation failed" });
+  }
+});
+
+// === HTTP endpoint: ML-ranked puzzles from recent games for a Chess.com user ===
+app.post("/puzzles/from-user-ml", async (req, res) => {
+  try {
+    const { username, maxGames, maxPuzzles, movetimeMs } = req.body || {};
+    const uname = String(username || "").trim();
+    if (!uname) return res.status(400).json({ ok: false, error: "missing username" });
+
+    const maxG = Number.isFinite(Number(maxGames)) ? Math.min(Math.max(Number(maxGames), 1), 50) : 15;
+    const maxP = Number.isFinite(Number(maxPuzzles)) ? Math.min(Math.max(Number(maxPuzzles), 1), 500) : 200;
+    const mt   = Number.isFinite(Number(movetimeMs)) ? Math.max(20, Math.min(Number(movetimeMs), 200)) : 60;
+
+    const puzzles = await buildUserRecentPuzzlesML({
+      username: uname,
+      maxGames: maxG,
+      maxPuzzles: maxP,
+      movetimeMs: mt,
+    });
+
+    res.json({
+      ok: true,
+      username: uname,
+      count: puzzles.length,
+      puzzles,
+    });
+  } catch (e) {
+    console.error("[/puzzles/from-user-ml] error:", e);
+    res.status(500).json({ ok: false, error: "puzzle generation failed" });
+  }
+});
 
 // Root fallback (serves index if no static file matched)
 app.get("/", (req, res) => {

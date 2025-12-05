@@ -700,6 +700,7 @@
             <div class="speed-select">
               <button class="speed-pill" id="btnDaily">Daily</button>
               <button class="speed-pill" id="btnRandom">Random</button>
+              <!--<button class="speed-pill" id="btnRandomML">ML-Ranked</button>-->
             </div>
             <div class="puzzle-toolbar-right">
               <button class="btn btn-outline" id="btnReset">Reset</button>
@@ -751,6 +752,16 @@
                 Load
               </button>
             </div>
+            
+            <div style="display:flex; gap:0.5rem; align-items:center; margin-top:0.4rem;">
+              <!--
+              <button class="btn btn-outline" id="btnBuildFromRecentML" style="font-size:0.8rem; padding:0.3rem 0.8rem;">
+                From last 15 games (ML)
+              </button>
+              -->
+            </div>
+
+
             <div class="muted" style="font-size:0.85rem;">
               We’ll fetch your most recent month of games and turn them into one-move tactics. Click a game to generate puzzles, then use ◀ / ▶ to step through them.
             </div>
@@ -813,6 +824,8 @@
     const gamesStatusEl  = document.getElementById('gamesStatus');
     const btnPrevPuzzle  = document.getElementById('btnPrevPuzzle');
     const btnNextPuzzle  = document.getElementById('btnNextPuzzle');
+    const btnBuildFromRecentML = document.getElementById('btnBuildFromRecentML');
+
   
     // --- State ---
     let boardArray = Array.from({length:8}, ()=>Array(8).fill(null));
@@ -1200,6 +1213,44 @@
       });
     }
 
+    async function loadRandomML(){
+      try{
+        const r = await fetch('/puzzles/random-ml');
+        const p = await r.json();
+        if (!p || !p.fen || !Array.isArray(p.moves) || !p.moves.length) throw new Error('bad puzzle');
+
+        startFen = p.fen;
+        solution = p.moves.map(m=>m.toLowerCase());
+        idx = 0; selected = null;
+        fromGamePuzzles = [];
+        fromGameIndex = -1;
+        fromGameGame = null;
+
+        labId.textContent = p.id || '—';
+        labRating.textContent = p.rating ? `~${p.rating}` : 'unrated';
+        themesEl.textContent = (p.themes || []).join(' · ');
+        solRawEl.textContent = solution.join(' ');
+
+        parseFEN(p.fen);
+        alertEl.style.display='none';
+        clearInterval(autoTimer); autoTimer = null;
+        renderBoard();
+
+        const err = verifySolutionOnce(p.fen, solution);
+        if (err){ showWrong('Puzzle data looks inconsistent: ' + err); }
+      } catch(e){
+        alertEl.style.display='block';
+        alertEl.textContent = 'Failed to load ML-ranked puzzle.';
+      }
+    }
+
+    document.getElementById('btnRandomML').onclick = () => {
+      loadRandomML();
+      document.getElementById('btnDaily').classList.remove('active');
+      document.getElementById('btnRandom').classList.remove('active');
+      document.getElementById('btnRandomML').classList.add('active');
+    };
+
     async function loadGamesForUser(){
       const username = usernameInput.value.trim();
       if (!username){
@@ -1388,6 +1439,63 @@
         }
       }
     })();
+
+    btnBuildFromRecentML.onclick = async () => {
+      const username = usernameInput.value.trim();
+      if (!username) {
+        setGamesStatus(true, 'Enter username');
+        return;
+      }
+
+      setGamesStatus(true, 'Building ML puzzles…');
+      alertEl.style.display = 'none';
+      fromGamePuzzles = [];
+      fromGameIndex = -1;
+      fromGameGame = null;
+
+      try {
+        const res = await fetch('/puzzles/from-user-ml', {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json' },
+          body: JSON.stringify({
+            username,
+            maxGames: 15,
+            maxPuzzles: 200,
+            movetimeMs: 60
+          })
+        });
+
+        if (!res.ok) {
+          setGamesStatus(true, 'Error');
+          alertEl.style.display='block';
+          alertEl.textContent = 'Failed to build ML puzzles.';
+          return;
+        }
+
+        const data = await res.json();
+        const puzzles = Array.isArray(data.puzzles) ? data.puzzles : [];
+
+        if (!puzzles.length) {
+          setGamesStatus(true, 'No puzzles found');
+          alertEl.style.display='block';
+          alertEl.textContent = 'No suitable puzzles found in recent games.';
+          return;
+        }
+
+        fromGamePuzzles  = puzzles;
+        fromGameUsername = username;
+        fromGameIndex    = 0;
+
+        // Show the top ML-ranked puzzle
+        applyGamePuzzleAt(0);
+        setGamesStatus(true, `ML puzzles: ${puzzles.length}`);
+      } catch (e) {
+        console.error(e);
+        setGamesStatus(true, 'Error');
+        alertEl.style.display='block';
+        alertEl.textContent = 'Failed to build ML puzzles.';
+      }
+    };
   
     loadDaily();
     document.getElementById('btnDaily').classList.add('active');
