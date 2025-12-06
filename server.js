@@ -82,6 +82,41 @@ CREATE TABLE IF NOT EXISTS puzzles (
 );
 `);
 
+function normalizeMlPuzzleRow(row) {
+  let solutionMoves = [];
+  if (row.solution_moves) {
+    try {
+      // DB stores e.g. "[""e5d4"",""d4d3""]"
+      solutionMoves = JSON.parse(row.solution_moves);
+    } catch (e) {
+      console.warn("Bad solution_moves JSON for puzzle id", row.id, row.solution_moves);
+    }
+  }
+
+  return {
+    fen: row.fen,
+    sideToMove: row.side_to_move,
+    uci: row.uci,
+    san: row.san,
+    ply: row.ply,
+    moveNumber: row.move_number,
+    source_event: row.source_event,
+    pre_eval_cp: row.pre_eval_cp,
+    best_eval_cp: row.best_eval_cp,
+    played_eval_cp: row.played_eval_cp,
+    eval_gap_cp: row.eval_gap_cp,
+    heuristic_difficulty: row.heuristic_difficulty,
+    is_mate: row.is_mate,
+    source_game_id: row.source_game_id,
+    time_control: row.time_control,
+    time_class: row.time_class,
+    rated: !!row.rated,
+    ml_score: row.ml_score,
+    solutionMoves,   // <--- this is what your frontend now uses
+  };
+}
+
+
 function gameById(id){
   return DB.prepare(`SELECT id, created_at, result, moves, pgn, time_control
                      FROM games WHERE id=?`).get(id);
@@ -138,8 +173,6 @@ function uciExchange(engineProc, lines, untilRegex) {
     engineProc.stdin.write(lines.join("\n") + "\n");
   });
 }
-
-// ---- Engine eval helper: get cp & bestmove for a FEN ----
 async function evalPositionCp(fen, movetimeMs = 80) {
   const lines = [
     `position fen ${fen}`,
@@ -154,6 +187,7 @@ async function evalPositionCp(fen, movetimeMs = 80) {
   let evalCp = null;
   let evalMate = null;
   let bestmove = null;
+  let pvMoves = [];
 
   if (infos.length) {
     const last = infos[infos.length - 1];
@@ -164,13 +198,91 @@ async function evalPositionCp(fen, movetimeMs = 80) {
 
     evalMate = takeNum(/\bscore\s+mate\s+(-?\d+)/);
     evalCp   = takeNum(/\bscore\s+cp\s+(-?\d+)/);
+
+    const pvMatch = last.match(/\bpv\s+(.+)/);
+    if (pvMatch) {
+      pvMoves = pvMatch[1]
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .map(m => m.toLowerCase());
+    }
   }
 
   const m = buf.match(/bestmove\s+(\S+)/);
   if (m) bestmove = m[1];
 
-  return { evalCp, evalMate, bestmove };
+  return { evalCp, evalMate, bestmove, pvMoves };
 }
+
+// ---- Engine eval helper: get cp & bestmove + PV for a FEN ----
+async function evalPositionPv(fen, movetimeMs = 80) {
+  const lines = [
+    `position fen ${fen}`,
+    "isready",
+    `go movetime ${movetimeMs}`,
+  ];
+  const until = /bestmove\s+\S+/;
+
+  const buf = await uciExchange(analysisEngine, lines, until);
+
+  const infos = buf.split(/\r?\n/).filter((l) => l.startsWith("info "));
+  let evalCp = null;
+  let evalMate = null;
+  let bestmove = null;
+  let pvMoves = [];
+
+  if (infos.length) {
+    const last = infos[infos.length - 1];
+    const parts = last.trim().split(/\s+/);
+
+    const idxScore = parts.indexOf("score");
+    if (idxScore !== -1 && idxScore + 2 < parts.length) {
+      const type = parts[idxScore + 1];
+      const val  = parseInt(parts[idxScore + 2], 10);
+      if (type === "cp") {
+        evalCp = val;
+      } else if (type === "mate") {
+        evalMate = val;
+        evalCp   = evalMate > 0 ? 100000 : -100000;
+      }
+    }
+
+    const idxPV = parts.indexOf("pv");
+    if (idxPV !== -1 && idxPV + 1 < parts.length) {
+      pvMoves = parts.slice(idxPV + 1); // raw UCI PV
+    }
+  }
+
+  const m = buf.match(/bestmove\s+(\S+)/);
+  if (m) bestmove = m[1];
+
+  return { evalCp, evalMate, bestmove, pv: pvMoves };
+}
+
+function buildSolutionFromPV(fen, pvMovesUci, maxPlies = 5) {
+  if (!Array.isArray(pvMovesUci) || !pvMovesUci.length) return [];
+
+  const game = new Chess(fen);
+  const out = [];
+
+  for (let i = 0; i < pvMovesUci.length && out.length < maxPlies; i++) {
+    const mv = String(pvMovesUci[i] || "").toLowerCase();
+    if (mv.length < 4) break;
+
+    const from = mv.slice(0, 2);
+    const to   = mv.slice(2, 4);
+    const promotion = mv[4] || undefined;
+
+    const ok = game.move({ from, to, promotion });
+    if (!ok) break;
+
+    out.push(from + to + (promotion || ""));
+  }
+
+  return out;
+}
+
 
 
 // ---- Python RF scorer helper ----
@@ -884,6 +996,14 @@ app.get("/games", (_req, res) => {
   res.json(rows);
 });
 
+
+// ...
+
+app.get("/puzzles", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "puzzles.html"));
+});
+
+
 app.get("/game/:id.pgn", (req, res) => {
   const id = Number(req.params.id);
   const row = DB.prepare("SELECT moves, pgn, time_control, result FROM games WHERE id=?").get(id);
@@ -1220,39 +1340,42 @@ async function buildEvalPuzzlesFromPGN({
   }
 
   const evaluated = [];
-
-  // Second: run engine evals and compute features
+  
+    // Second: run engine evals and compute features
   for (const c of candidates) {
     try {
-      const pre = await evalPositionCp(c.fen, movetimeMs);
+      // 1) Eval + PV at the position before the played move
+      const pre = await evalPositionPv(c.fen, movetimeMs);
       if (pre.evalCp == null && pre.evalMate == null) continue;
 
-      const aft = await evalPositionCp(c.fenAfterPlayed, movetimeMs);
+      // 2) Eval after the *played* move (we only need score, not PV)
+      const aft = await evalPositionPv(c.fenAfterPlayed, movetimeMs);
       if (aft.evalCp == null && aft.evalMate == null) continue;
 
       const mateToCp = (m) => (m == null ? null : (m > 0 ? 100000 : -100000));
 
-      const preCpRaw =
-        pre.evalCp != null ? pre.evalCp : mateToCp(pre.evalMate);
-      const afterCpRaw =
-        aft.evalCp != null ? aft.evalCp : mateToCp(aft.evalMate);
+      const preCpRaw   = pre.evalCp != null ? pre.evalCp : mateToCp(pre.evalMate);
+      const afterCpRaw = aft.evalCp != null ? aft.evalCp : mateToCp(aft.evalMate);
 
       if (preCpRaw == null || afterCpRaw == null) continue;
 
-      const pre_eval_cp = preCpRaw;
-      const best_eval_cp = pre_eval_cp;
-
-      // after position: opponent to move; flip sign to keep hero POV
-      const played_eval_cp = -afterCpRaw;
-
-      const eval_gap_cp = best_eval_cp - played_eval_cp;
+      const pre_eval_cp   = preCpRaw;
+      const best_eval_cp  = pre_eval_cp;     // "best" line starts from this eval
+      const played_eval_cp= -afterCpRaw;     // flip sign: hero POV
+      const eval_gap_cp   = best_eval_cp - played_eval_cp;
+      const absGap        = Math.abs(eval_gap_cp);
 
       const heuristic_difficulty = Math.max(
         0,
-        Math.min(4000, Math.abs(eval_gap_cp) + Math.max(0, best_eval_cp))
+        Math.min(4000, absGap + Math.max(0, best_eval_cp))
       );
-
       const is_mate = pre.evalMate != null ? 1 : 0;
+
+      // Take a short best line from the PV as the solution (hero + replies).
+      const pvMoves = Array.isArray(pre.pv) ? pre.pv : [];
+      const solutionMoves = pvMoves.length
+        ? pvMoves.slice(0, 6)          // e.g. up to 3 moves for each side
+        : [c.uci];                     // fallback: just the missed best move
 
       evaluated.push({
         fen: c.fen,
@@ -1268,11 +1391,17 @@ async function buildEvalPuzzlesFromPGN({
         eval_gap_cp,
         heuristic_difficulty,
         is_mate,
+        solutionMoves,                // NEW
       });
+
     } catch (e) {
-      console.error("[from-user eval] failed for ply", c.ply, e);
+      console.error(
+        `[from-user] eval failed for game ${tags.Event || ""} move ${c.san} (${c.uci}):`,
+        e
+      );
     }
   }
+
 
   console.log(
     `[from-user] game ${tags.Event || ""}: candidates=${candidates.length}, evaluated=${evaluated.length}`
@@ -1300,6 +1429,32 @@ async function buildEvalPuzzlesFromPGN({
 
   return filtered;
 }
+
+function extractSolutionMoves(p) {
+  // 1. DB-style JSON text (solution_moves column)
+  if (p.solution_moves) {
+    try {
+      const arr = JSON.parse(p.solution_moves);
+      if (Array.isArray(arr) && arr.length) return arr;
+    } catch (e) {
+      console.warn("[ML] bad solution_moves JSON:", p.solution_moves);
+    }
+  }
+
+  // 2. Already an array (maybe computed earlier)
+  if (Array.isArray(p.solutionMoves) && p.solutionMoves.length) {
+    return p.solutionMoves;
+  }
+  if (Array.isArray(p.moves) && p.moves.length) {
+    return p.moves;
+  }
+
+  // 3. Fallback to single move
+  if (p.uci) return [p.uci];
+
+  return [];
+}
+
 
 
 async function buildUserRecentPuzzlesML({
@@ -1360,7 +1515,8 @@ async function buildUserRecentPuzzlesML({
     scored = allPuzzles.map((p) => ({ ...p, ml_score: p.eval_gap_cp }));
   }
 
-  const THRESH = 0.5; // tune this if needed
+  
+  const THRESH = 0.5;
   let mlPuzzles = scored.filter(
     (p) => p.ml_score != null && p.ml_score >= THRESH
   );
@@ -1369,13 +1525,68 @@ async function buildUserRecentPuzzlesML({
     `[from-user] ML accepted ${mlPuzzles.length} / ${scored.length} candidates (threshold=${THRESH})`
   );
 
-  // Sort best to worst and cap
   mlPuzzles.sort((a, b) => (b.ml_score || 0) - (a.ml_score || 0));
   if (mlPuzzles.length > maxPuzzles) {
     mlPuzzles = mlPuzzles.slice(0, maxPuzzles);
   }
 
-  return mlPuzzles;
+  const normalized = mlPuzzles.map((p) => {
+  const solutionMoves = extractSolutionMoves(p);
+
+  return {
+    // core position
+    fen: p.fen,
+    sideToMove: p.sideToMove || p.side_to_move || "w",
+    uci: p.uci,
+    san: p.san,
+    ply: p.ply,
+    moveNumber: p.moveNumber || p.move_number,
+
+    // eval features
+    pre_eval_cp: p.pre_eval_cp,
+    best_eval_cp: p.best_eval_cp,
+    played_eval_cp: p.played_eval_cp,
+    eval_gap_cp: p.eval_gap_cp,
+    heuristic_difficulty: p.heuristic_difficulty,
+    is_mate: p.is_mate,
+
+    // context
+    source_event: p.source_event,
+    source_game_id: p.source_game_id,
+    time_control: p.time_control,
+    time_class: p.time_class,
+    rated: !!p.rated,
+
+    // ML
+    ml_score: p.ml_score,
+
+    // solution: expose under BOTH names
+    moves: solutionMoves,      // <- NEW
+    solutionMoves,             // you can keep this for debugging
+  };
+});
+
+
+
+    console.log(
+    "[from-user ML] sample normalized:",
+    normalized.slice(0, 1).map((p) => ({
+      keys: Object.keys(p),
+      solutionMoves: p.solutionMoves,
+    }))
+  );
+
+    console.log(
+    "[from-user ML] sample normalized:",
+    normalized.slice(0, 3).map((p) => ({
+      fen: p.fen,
+      uci: p.uci,
+      len: p.solutionMoves.length,
+      solutionMoves: p.solutionMoves,
+    }))
+  );
+
+  return normalized;
 }
 
 
@@ -1445,11 +1656,11 @@ async function buildPuzzlesFromPGNWithEval({ pgn, username, maxPuzzles = 12, mov
   for (const c of candidates) {
     try {
       // Eval of position before move (sideToMove POV)
-      const pre = await evalPositionCp(c.fen, movetimeMs);
+      const pre = await evalPositionPv(c.fen, movetimeMs);
       if (pre.evalCp == null && pre.evalMate == null) continue;
 
       // Eval of position after the played move (opponent to move POV)
-      const aft = await evalPositionCp(c.fenAfterPlayed, movetimeMs);
+      const aft = await evalPositionPv(c.fenAfterPlayed, movetimeMs);
       if (aft.evalCp == null && aft.evalMate == null) continue;
 
       // Convert "mate" to large cp value if needed
@@ -1479,8 +1690,13 @@ async function buildPuzzlesFromPGNWithEval({ pgn, username, maxPuzzles = 12, mov
         0,
         Math.min(4000, absGap + Math.max(0, best_eval_cp))
       );
-
       const is_mate = pre.evalMate != null ? 1 : 0;
+
+      const pvMoves = Array.isArray(pre.pv) ? pre.pv : [];
+      const solutionMoves = pvMoves.length
+        ? pvMoves.slice(0, 6)   // up to 3 full moves each side
+        : [c.uci];              // fallback: single best move
+
 
       evaluated.push({
         id: c.id,
@@ -1496,7 +1712,9 @@ async function buildPuzzlesFromPGNWithEval({ pgn, username, maxPuzzles = 12, mov
         eval_gap_cp,
         heuristic_difficulty,
         is_mate,
+        solutionMoves,                  //  NEW
       });
+
     } catch (e) {
       console.error("[from-game eval] failed for ply", c.ply, e);
     }
@@ -1574,8 +1792,6 @@ app.post("/puzzles/from-game", async (req, res) => {
     res.status(500).json({ ok: false, error: "puzzle generation failed" });
   }
 });
-
-// === HTTP endpoint: ML-ranked puzzles from recent games for a Chess.com user ===
 app.post("/puzzles/from-user-ml", async (req, res) => {
   try {
     const { username, maxGames, maxPuzzles, movetimeMs } = req.body || {};
@@ -1593,6 +1809,9 @@ app.post("/puzzles/from-user-ml", async (req, res) => {
       movetimeMs: mt,
     });
 
+    console.log("=== OUTGOING from-user-ml SAMPLE ===");
+    console.dir(puzzles[0], { depth: null });
+
     res.json({
       ok: true,
       username: uname,
@@ -1605,10 +1824,6 @@ app.post("/puzzles/from-user-ml", async (req, res) => {
   }
 });
 
-// Root fallback (serves index if no static file matched)
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
 
 function shutdown() {
   try { playEngine.kill("SIGTERM"); } catch {}

@@ -265,9 +265,7 @@
       .shell {
         grid-template-columns: minmax(0, 1fr);
       }
-      .topbar-nav {
-        display: none;
-      }
+      
       .page {
         padding-inline: 0.75rem;
       }
@@ -840,20 +838,14 @@
 
       <!-- Puzzles -->
       <div class="nav-item">
-        <a href="/puzzles.html" class="nav-link">Puzzles</a>
+        
+      <!-- Puzzles -->
+      <div class="nav-item">
+        <a href="/puzzles" class="nav-link active">Puzzles</a>
         <div class="nav-dropdown">
-          <a href="#">
-            Daily puzzle  
-            <!--<span>One challenge / day</span>-->
-          </a>
-          <a href="#">
-            Random puzzles
-            <!--<span>Endless tactics</span>-->
-          </a>
-          <a href="#">
-            From your games
-            <!--<span>Fix your blunders</span>-->
-          </a>
+          <a href="/puzzles"><span>Daily puzzle</span></a>
+          <a href="/puzzles"><span>Random puzzles</span></a>
+          <a href="/puzzles"><span>From your games</span></a>
         </div>
       </div>
 
@@ -945,18 +937,18 @@
             </div>
           </div>
           <div class="card-controls">
+            <!--
             <div class="speed-select">
               <button class="speed-pill active" style="display:none">Bullet</button>
               <button class="speed-pill" style="display:none">Blitz</button>
               <button class="speed-pill" style="display:none">Rapid</button>
-            </div>
+            </div> -->
             <!-- Secondary New Game button (optional)
                  If you prefer the main "New game" here instead of in the topbar,
                  move id="new" from the topbar to this button. -->
             <!-- <button class="btn btn-primary" id="new">New game</button> -->
           </div>
         </div>
-
 
         <!-- Engine metrics (wired to JS) -->
         <!-- 
@@ -983,10 +975,9 @@
           </div>
           <div class="card-option-group card-option-group-right">
             <button class="btn btn-outline" id="flip">Flip</button>
+            <button class="btn btn-outline" id="hintBtn">Hint</button>
             <button class="btn btn-outline" id="engineMove" style="display:none">Engine Move</button>
-            <button class="btn btn-outline" id="finish" style="border-color:rgba(235,87,87,.65); display:none">
-              Finish
-            </button>
+            <button class="btn btn-outline" id="finish" style="border-color:rgba(235,87,87,.65); display:none">Finish Game</button>
           </div>
         </div>
 
@@ -1024,8 +1015,6 @@
           <div class="board-footer">
             <div class="controls-main">
               <button class="btn btn-outline" style="display:none">Undo</button>
-              <button class="btn btn-outline" id="hintBtn">Hint</button>
-
               <button class="btn btn-outline" style="display:none">Analyze</button>
             </div>
             <div style="display:flex;align-items:center;flex:1;justify-content:flex-end;gap:0.35rem;">
@@ -1179,6 +1168,19 @@
     let clocks = { w: 5*60*1000, b: 5*60*1000 }, clockTimer=null;
 
     function log(s){ const el=document.getElementById('log'); el.textContent=s+"\n"+el.textContent; }
+    function setRating(text) {
+      const trimmed = (text || '').trim();
+      if (!trimmed) {
+        labRating.textContent = '';
+        labRating.classList.remove('card-meta-sep');
+      } else {
+        labRating.textContent = trimmed;
+        if (!labRating.classList.contains('card-meta-sep')) {
+          labRating.classList.add('card-meta-sep');
+        }
+      }
+    }
+
 
     function setThinking(on, stats){
       spinner.style.display = on ? 'inline-block' : 'none';

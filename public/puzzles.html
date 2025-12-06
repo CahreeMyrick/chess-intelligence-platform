@@ -248,9 +248,7 @@
       .shell {
         grid-template-columns: minmax(0, 1fr);
       }
-      .topbar-nav {
-        display: none;
-      }
+      
       .page {
         padding-inline: 0.75rem;
       }
@@ -548,11 +546,11 @@
 
       <!-- Puzzles -->
       <div class="nav-item">
-        <a href="/puzzles.html" class="nav-link active">Puzzles</a>
+        <a href="/puzzles" class="nav-link active">Puzzles</a>
         <div class="nav-dropdown">
-          <a href="/puzzles.html"><span>Daily puzzle</span><span>From Chess.com</span></a>
-          <a href="/puzzles.html"><span>Random puzzles</span><span>Fresh each click</span></a>
-          <a href="/puzzles.html"><span>From your games</span><span>Chess.com + ML</span></a>
+          <a href="/puzzles"><span>Daily puzzle</span></a>
+          <a href="/puzzles"><span>Random puzzles</span></a>
+          <a href="/puzzles"><span>From your games</span></a>
         </div>
       </div>
     </nav>
@@ -752,6 +750,16 @@
     }
     function recomputeOrientation(){
       whiteAtBottom = (viewMode === 'white') ? true : (initSide === 'w');
+    }
+    function setThemes(themesArray) {
+      const arr = Array.isArray(themesArray) ? themesArray : [];
+      if (!arr.length) {
+        themesEl.textContent = '';
+        themesEl.style.display = 'none';
+      } else {
+        themesEl.textContent = arr.join(' · ');
+        themesEl.style.display = 'inline-block';
+      }
     }
 
     function parseFEN(fen){
@@ -1020,7 +1028,7 @@
           ? `rated ~${p.rating}`
           : 'unrated';
 
-        themesEl.textContent = (p.themes || []).join(' · ');
+        setThemes(p.themes || []);
         solRawEl.textContent = solution.join(' ');
 
         parseFEN(p.fen);
@@ -1061,8 +1069,7 @@
         labRating.textContent = p.rating
           ? `rated ~${p.rating}`
           : 'unrated';
-
-        themesEl.textContent = (p.themes || []).join(' · ');
+        setThemes(p.themes || []);
         solRawEl.textContent = solution.join(' ');
 
         parseFEN(p.fen);
@@ -1139,10 +1146,10 @@
       fromGameIndex = -1;
       fromGameGame = null;
 
-      try{
-        // 1) Fetch recent month from backend, then locally trim to 15
+      try {
+        // 1) Fetch recent games from backend
         const res = await fetch(`/chesscom/${encodeURIComponent(username)}/games/recent`);
-        if (!res.ok){
+        if (!res.ok) {
           setGamesStatus(true, 'Error loading games');
           gamesListEl.innerHTML = '<div class="muted">Failed to load games from Chess.com.</div>';
           return;
@@ -1167,13 +1174,28 @@
             })
           });
 
+          console.log("[from-user-ml] HTTP status:", mlRes.status, "ok?", mlRes.ok);
+
           if (!mlRes.ok) {
-            setGamesStatus(true, `Loaded ${gameCount} games · ML analysis failed`);
+            const text = await mlRes.text();
+            console.error("[from-user-ml] HTTP error body:", text);
+            setGamesStatus(true, `Loaded ${gameCount} games · ML HTTP ${mlRes.status}`);
             return;
           }
 
-          const mlData = await mlRes.json();
+          let mlData;
+          try {
+            const raw = await mlRes.text();
+            console.log("[from-user-ml] raw body:", raw);
+            mlData = JSON.parse(raw);
+          } catch (e) {
+            console.error("[from-user-ml] JSON parse error:", e);
+            setGamesStatus(true, `Loaded ${gameCount} games · ML JSON error`);
+            return;
+          }
+
           const puzzles = Array.isArray(mlData.puzzles) ? mlData.puzzles : [];
+          console.log("[from-user-ml] parsed puzzles:", puzzles.length, puzzles.slice(0, 3));
 
           if (!puzzles.length) {
             setGamesStatus(true, `Loaded ${gameCount} games · no ML puzzles found`);
@@ -1186,12 +1208,13 @@
           fromGameUsername = username;
           fromGameIndex    = 0;
 
-          // Show top ML-ranked puzzle
+          console.log("[from-user-ml] calling applyGamePuzzleAt(0)");
           applyGamePuzzleAt(0);
+
           setGamesStatus(true, `Loaded ${gameCount} games · ${puzzles.length} ML-ranked puzzles`);
         } catch(e){
-          console.error(e);
-          setGamesStatus(true, `Loaded ${gameCount} games · ML analysis failed`);
+          console.error("[from-user-ml] JS error:", e);
+          setGamesStatus(true, `Loaded ${gameCount} games · ML JS error`);
         }
       } catch(e){
         console.error(e);
@@ -1199,6 +1222,7 @@
         gamesListEl.innerHTML = '<div class="muted">Failed to load games.</div>';
       }
     }
+
 
     async function startPuzzlesFromGame(username, game){
       if (!game || !game.pgn){
@@ -1245,15 +1269,35 @@
         alertEl.textContent = 'Failed to build puzzles from that game.';
       }
     }
-
+    
+    
     function applyGamePuzzleAt(i){
       if (!fromGamePuzzles.length) return;
       if (i < 0 || i >= fromGamePuzzles.length) return;
       fromGameIndex = i;
 
       const pz = fromGamePuzzles[i];
+
+      let moves = [];
+      if (Array.isArray(pz.solutionMoves) && pz.solutionMoves.length) {
+        moves = pz.solutionMoves;
+      } else if (Array.isArray(pz.moves) && pz.moves.length) {
+        moves = pz.moves;
+      } else if (pz.uci) {
+        moves = [pz.uci];
+      } else {
+        moves = [];
+      }
+
+      console.log("[applyGamePuzzleAt] index", i, {
+        lenSolutionMoves: Array.isArray(pz.solutionMoves) ? pz.solutionMoves.length : null,
+        lenMoves: Array.isArray(pz.moves) ? pz.moves.length : null,
+        pickedSolutionLength: moves.length,
+        raw: pz
+      });
+
       startFen = pz.fen;
-      solution = [String(pz.uci || '').toLowerCase()];
+      solution = moves.map(m => String(m).toLowerCase());
       idx = 0;
       selected = null;
 
@@ -1262,14 +1306,13 @@
       clearInterval(autoTimer); autoTimer = null;
 
       const total = fromGamePuzzles.length;
+      console.log("[applyGamePuzzleAt] index", i, { total, solutionLength: solution.length });
 
       if (pz.ml_score != null) {
-        // ML-ranked across last 15 games
         labId.textContent = `Puzzle ${i + 1} of ${total}`;
         labRating.textContent = 'From your games';
-        themesEl.textContent = 'from your games';
+        setThemes(['from your games']);
       } else {
-        // Legacy / per-game puzzles
         const moveNo = pz.moveNumber || pz.ply || (i + 1);
         if (fromGameGame && typeof fromGameGame.id === 'number') {
           labId.textContent = `Game ${fromGameGame.id + 1}, move ${moveNo}`;
@@ -1281,18 +1324,22 @@
           labId.textContent = `Move ${moveNo}`;
           labRating.textContent = '';
         }
-        themesEl.textContent = 'from your game';
+        setThemes(['from your game']);
       }
 
-      solRawEl.textContent = solution.join(' ');
+      solRawEl.textContent = solution.length ? solution.join(' ') : '—';
 
       renderBoard();
 
-      const err = verifySolutionOnce(startFen, solution);
-      if (err){
-        showWrong('Puzzle data looks inconsistent: ' + err);
+      if (solution.length) {
+        const err = verifySolutionOnce(startFen, solution);
+        if (err){
+          showWrong('Puzzle data looks inconsistent: ' + err);
+        }
       }
     }
+
+
 
     // --- Top buttons ---
     document.getElementById('btnRandom').onclick = () => {
