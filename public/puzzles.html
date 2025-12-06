@@ -1159,7 +1159,7 @@
 
         const allGames = Array.isArray(data.games) ? data.games : [];
         const gameCount = Math.min(15, allGames.length || 0);
-        setGamesStatus(true, `Loaded ${gameCount} recent games · analyzing with ML…`);
+        setGamesStatus(true, `Loaded ${gameCount} recent games · analyzing…`);
 
         // 2) Run ML ranking over last 15 games via backend
         try {
@@ -1211,7 +1211,7 @@
           console.log("[from-user-ml] calling applyGamePuzzleAt(0)");
           applyGamePuzzleAt(0);
 
-          setGamesStatus(true, `Loaded ${gameCount} games · ${puzzles.length} ML-ranked puzzles`);
+          setGamesStatus(true, `Loaded ${gameCount} games · ${puzzles.length} top-ranked puzzles`);
         } catch(e){
           console.error("[from-user-ml] JS error:", e);
           setGamesStatus(true, `Loaded ${gameCount} games · ML JS error`);
