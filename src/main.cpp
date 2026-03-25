@@ -14,7 +14,7 @@
 
 using namespace chess;
 
-// ---- (same board printer / parser from the previous message) ----
+// ---- board printer ---- //
 static void display_board_bb(const BoardBB& pos) {
     auto at = [&](int r, int c)->char {
         Square s = Square(r*8 + c);
@@ -75,7 +75,7 @@ static bool parse_square(const std::string& s, int& r, int& c) {
     return true;
 }
 
-// --- replace your existing parse_engine_move with this one ---
+// --- parse engine move---
 static bool parse_engine_move(const std::string& line, int& r0,int& c0,int& r1,int& c1) {
     // normalize: replace commas with spaces, collapse spaces
     std::string norm; norm.reserve(line.size());
@@ -128,6 +128,7 @@ static bool parse_engine_move(const std::string& line, int& r0,int& c0,int& r1,i
     return (r0|c0|r1|c1) >= 0;
 }
 */
+
 static bool pick_move_from_to(BoardBB& pos, int r0,int c0,int r1,int c1, Move& out) {
     std::vector<Move> moves;
     pos.generate_legal_moves(moves);
