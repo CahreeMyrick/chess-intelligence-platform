@@ -101,10 +101,13 @@ static int negamax(BoardBB& pos, int depth, int alpha, int beta){
     return best;
 }
 
-Move search_best_move(BoardBB& pos, int depth){
+Move search_best_move(BoardBB& pos, int depth, int* out_score){
     std::vector<Move> moves;
     pos.generate_legal_moves(moves);
-    if (moves.empty()) return Move(); // no move
+    if (moves.empty()) {
+        if (out_score) *out_score = 0;
+        return Move(); // no move
+    }
 
     // order first layer too
     std::sort(moves.begin(), moves.end(), [&](const Move& a, const Move& b){
@@ -127,7 +130,9 @@ Move search_best_move(BoardBB& pos, int depth){
         }
         if (sc > alpha) alpha = sc;
     }
+    if (out_score) *out_score = bestSc;
     return best;
 }
 
 } // namespace chess
+

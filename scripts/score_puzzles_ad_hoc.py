@@ -11,8 +11,11 @@ Each input puzzle must have the features used in training:
 import os
 import sys
 import json
+import warnings
+warnings.filterwarnings("ignore")
 import numpy as np
 import joblib
+
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(ROOT_DIR, "data")

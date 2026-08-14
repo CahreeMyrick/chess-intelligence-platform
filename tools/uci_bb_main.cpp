@@ -127,10 +127,15 @@ struct UciBB {
                 // (You can parse wtime/btime/inc here if you later add time mgmt)
             }
         }
-        Move best = search_best_move(pos, std::max(1,depth));
-        std::cout << "bestmove " << move_to_uci(best) << "\n";
+        int score = 0;
+        int d = std::max(1, depth);
+        Move best = search_best_move(pos, d, &score);
+        std::string uciMove = move_to_uci(best);
+        std::cout << "info depth " << d << " score cp " << score << " pv " << uciMove << "\n";
+        std::cout << "bestmove " << uciMove << "\n";
         std::cout.flush();
     }
+
 };
 
 int main(){

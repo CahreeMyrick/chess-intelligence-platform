@@ -9,7 +9,8 @@ namespace chess {
 int eval_bb(const BoardBB& pos);
 
 // Search best move for current side with depth ply (negamax + alpha-beta)
-Move search_best_move(BoardBB& pos, int depth);
+Move search_best_move(BoardBB& pos, int depth, int* out_score = nullptr);
+
 
 // Optional: convert a move to UCI (e2e4)
 inline std::string to_uci(const Move& m){

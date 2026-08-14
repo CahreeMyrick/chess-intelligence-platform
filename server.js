@@ -5,6 +5,8 @@ const path = require("path");
 const fs = require("fs");
 const rateLimit = require("express-rate-limit");
 const crypto = require("crypto");
+const { createGameRouter } = require("./server/game-routes.cjs");
+
 
 
 
@@ -28,11 +30,19 @@ const PLAY_ENGINE_PATH =
   process.env.PLAY_ENGINE_PATH ||
   path.join(__dirname, "build", "chess_uci_bb");  // your Ichigo binary
 
-// Default ANALYSIS_ENGINE_PATH to PLAY_ENGINE_PATH if not set
+const STOCKFISH_BIN =
+  process.env.STOCKFISH_PATH ||
+  (fs.existsSync("/opt/homebrew/bin/stockfish")
+    ? "/opt/homebrew/bin/stockfish"
+    : fs.existsSync("/usr/local/bin/stockfish")
+    ? "/usr/local/bin/stockfish"
+    : null);
+
 const ANALYSIS_ENGINE_PATH =
   process.env.ANALYSIS_ENGINE_PATH ||
-  process.env.STOCKFISH_PATH ||    // optional alias
+  STOCKFISH_BIN ||
   PLAY_ENGINE_PATH;
+
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
 
@@ -289,21 +299,29 @@ function buildSolutionFromPV(fen, pvMovesUci, maxPlies = 5) {
 async function scorePuzzlesWithPython(puzzles) {
   return new Promise((resolve, reject) => {
     const scriptPath = path.join(__dirname, "scripts", "score_puzzles_ad_hoc.py");
+    const venvPython = path.join(__dirname, ".venv", "bin", "python3");
+    const pythonBin =
+      process.env.PYTHON_PATH ||
+      (fs.existsSync(venvPython) ? venvPython : "python3");
 
-    const proc = spawn("python", [scriptPath], {
-      stdio: ["pipe", "pipe", "inherit"], // stdin, stdout, stderr->server stderr
+    const proc = spawn(pythonBin, [scriptPath], {
+      stdio: ["pipe", "pipe", "pipe"],
     });
 
     let out = "";
+    let errOut = "";
     proc.stdout.on("data", (d) => {
       out += d.toString();
+    });
+    proc.stderr.on("data", (d) => {
+      errOut += d.toString();
     });
 
     proc.on("error", (err) => reject(err));
 
     proc.on("close", (code) => {
       if (code !== 0) {
-        return reject(new Error(`score_puzzles_ad_hoc.py exited with code ${code}`));
+        return reject(new Error(`score_puzzles_ad_hoc.py exited with code ${code}: ${errOut}`));
       }
       try {
         const parsed = JSON.parse(out);
@@ -317,6 +335,7 @@ async function scorePuzzlesWithPython(puzzles) {
     proc.stdin.end();
   });
 }
+
 
 
 // init engines once at startup
@@ -901,121 +920,19 @@ app.get("/puzzles/random-ml", (req, res) => {
 });
 
 
-app.post("/game/:id/move", (req, res) => {
-  const id = Number(req.params.id);
-  const { uci } = req.body || {};
-  if (!/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(String(uci||"")))
-    return res.status(400).json({ error: "bad uci format" });
-
-  const row = gameById(id);
-  if (!row) return res.status(404).json({ error: "not found" });
-
-  const prev = (row.moves || "").split(" ").filter(Boolean);
-  const g = gameFromMoves(prev);
-  if (!g) return res.status(409).json({ error: "corrupt game history" });
-
-  const from = uci.slice(0,2), to = uci.slice(2,4);
-  const promotion = uci[4] || undefined;
-  const ok = g.move({ from, to, promotion });
-  if (!ok) return res.status(422).json({ error: "illegal move" });
-
-  const next = prev.concat(uci);
-  const nextStr = next.join(" ");
-
-  const isCheckmate   = api(g, "isCheckmate", "in_checkmate")();
-  const isStalemate   = api(g, "isStalemate", "in_stalemate")();
-  const isDraw        = api(g, "isDraw", "in_draw")();
-  const isThreefold   = api(g, "isThreefoldRepetition", "in_threefold_repetition")();
-  const isInsuff      = api(g, "isInsufficientMaterial", "insufficient_material")();
-
-  let over = false, reason = null, result = "*";
-
-  if (isCheckmate) {
-    over = true;
-    const loser = g.turn();
-    const winner = loser === 'w' ? 'b' : 'w';
-    result = winner === 'w' ? "1-0" : "0-1";
-    reason = "checkmate";
-  } else if (isStalemate) {
-    over = true; result = "1/2-1/2"; reason = "stalemate";
-  } else if (isThreefold) {
-    over = true; result = "1/2-1/2"; reason = "threefold repetition";
-  } else if (isInsuff) {
-    over = true; result = "1/2-1/2"; reason = "insufficient material";
-  } else if (isDraw) {
-    over = true; result = "1/2-1/2"; reason = "draw";
-  }
-
-  DB.prepare("UPDATE games SET moves=? WHERE id=?").run(nextStr, id);
-
-  let pgn = null;
-  if (over) {
-    const movesUci = next;
-    pgn = uciListToPgn({
-      movesUci,
-      headers: { Event: "Web Game", TimeControl: row.time_control || "300+0" },
-      result
-    });
-    DB.prepare("UPDATE games SET result=?, pgn=? WHERE id=?").run(result, pgn, id);
-  }
-
-  res.json({
-    ok: true,
-    moves: nextStr,
-    fen: g.fen(),
-    over,
-    reason,
-    result,
-    pgn
-  });
-});
-
-app.post("/game/:id/finish", (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const { result="*" } = req.body || {};
-    const row = gameById(id); if (!row) return res.status(404).json({error:"not found"});
-    const movesUci = row.moves ? row.moves.split(" ").filter(Boolean) : [];
-    const pgn = uciListToPgn({ movesUci, headers: { Event:"Web Game", TimeControl: row.time_control }, result });
-    DB.prepare("UPDATE games SET result=?, pgn=? WHERE id=?").run(result, pgn, id);
-    res.json({ ok:true, result, pgn });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ ok:false, error:"finish failed" });
-  }
-});
-
-app.get("/game/:id", (req, res) => {
-  const id = Number(req.params.id);
-  const row = gameById(id); if (!row) return res.status(404).json({error:"not found"});
-  res.json(row);
-});
-
-app.get("/games", (_req, res) => {
-  const rows = DB.prepare("SELECT id, created_at, result, time_control FROM games ORDER BY id DESC LIMIT 50").all();
-  res.json(rows);
-});
-
-
-// ...
+app.use(createGameRouter({
+  express,
+  DB,
+  gameById,
+  gameFromMoves,
+  chessApi: api,
+  uciListToPgn,
+}));
 
 app.get("/puzzles", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "puzzles.html"));
 });
 
-
-app.get("/game/:id.pgn", (req, res) => {
-  const id = Number(req.params.id);
-  const row = DB.prepare("SELECT moves, pgn, time_control, result FROM games WHERE id=?").get(id);
-  if (!row) return res.status(404).type("text/plain").send("not found");
-  const movesUci = (row.moves || "").split(" ").filter(Boolean);
-  const pgn = row.pgn || uciListToPgn({
-    movesUci,
-    headers: { Event: "Web Game", TimeControl: row.time_control || "300+0" },
-    result: row.result || "*"
-  });
-  res.type("text/plain").send(pgn);
-});
 
 
 // HTTP endpoint: recent games (last N games, default 15)
@@ -1071,7 +988,7 @@ async function fetchJsonWithTimeout(url, { timeoutMs = 5000 } = {}) {
   try {
     const r = await fetch(url, {
       headers: {
-        "User-Agent": "Ichigo/1.0 (+your-email-or-site)",
+        "User-Agent": "Mozilla/5.0 (compatible; IchigoChessApp/1.0; +https://github.com/ichigo-chess)",
         "Accept": "application/json",
       },
       signal: ctrl.signal,
@@ -1339,10 +1256,21 @@ async function buildEvalPuzzlesFromPGN({
     replay.move(moveObj);
   }
 
+  // Sample up to 15 key candidate positions per game to keep response fast
+  let sampledCandidates = candidates;
+  if (candidates.length > 15) {
+    const step = Math.max(1, Math.floor(candidates.length / 15));
+    sampledCandidates = [];
+    for (let i = 0; i < candidates.length && sampledCandidates.length < 15; i += step) {
+      sampledCandidates.push(candidates[i]);
+    }
+  }
+
   const evaluated = [];
   
-    // Second: run engine evals and compute features
-  for (const c of candidates) {
+  // Second: run engine evals and compute features
+  for (const c of sampledCandidates) {
+
     try {
       // 1) Eval + PV at the position before the played move
       const pre = await evalPositionPv(c.fen, movetimeMs);
@@ -1409,7 +1337,7 @@ async function buildEvalPuzzlesFromPGN({
 
   if (!evaluated.length) return [];
 
-  const BIG_GAP_CP = 120; // ~1.2 pawns
+  const BIG_GAP_CP = 60; // ~0.6 pawns (captures mistakes and tactical opportunities)
 
   // Only keep genuinely "big blunder" positions
   let filtered = evaluated.filter(
@@ -1508,15 +1436,19 @@ async function buildUserRecentPuzzlesML({
 
   // === ML scoring via Python script ===
   let scored;
+  let isMlFallback = false;
   try {
     scored = await scorePuzzlesWithPython(allPuzzles);
   } catch (e) {
-    console.error("[from-user ML] scoring failed, falling back to eval_gap_cp:", e);
-    scored = allPuzzles.map((p) => ({ ...p, ml_score: p.eval_gap_cp }));
+    console.error("[from-user ML] scoring failed, falling back to sigmoid eval gap ranking:", e);
+    isMlFallback = true;
+    scored = allPuzzles.map((p) => {
+      const estProb = 1 / (1 + Math.exp(-((p.eval_gap_cp || 0) - 100) / 100));
+      return { ...p, ml_score: estProb };
+    });
   }
 
-  
-  const THRESH = 0.5;
+  const THRESH = isMlFallback ? 0.05 : 0.1;
   let mlPuzzles = scored.filter(
     (p) => p.ml_score != null && p.ml_score >= THRESH
   );
@@ -1531,60 +1463,43 @@ async function buildUserRecentPuzzlesML({
   }
 
   const normalized = mlPuzzles.map((p) => {
-  const solutionMoves = extractSolutionMoves(p);
+    const solutionMoves = extractSolutionMoves(p);
 
-  return {
-    // core position
-    fen: p.fen,
-    sideToMove: p.sideToMove || p.side_to_move || "w",
-    uci: p.uci,
-    san: p.san,
-    ply: p.ply,
-    moveNumber: p.moveNumber || p.move_number,
-
-    // eval features
-    pre_eval_cp: p.pre_eval_cp,
-    best_eval_cp: p.best_eval_cp,
-    played_eval_cp: p.played_eval_cp,
-    eval_gap_cp: p.eval_gap_cp,
-    heuristic_difficulty: p.heuristic_difficulty,
-    is_mate: p.is_mate,
-
-    // context
-    source_event: p.source_event,
-    source_game_id: p.source_game_id,
-    time_control: p.time_control,
-    time_class: p.time_class,
-    rated: !!p.rated,
-
-    // ML
-    ml_score: p.ml_score,
-
-    // solution: expose under BOTH names
-    moves: solutionMoves,      // <- NEW
-    solutionMoves,             // you can keep this for debugging
-  };
-});
-
-
-
-    console.log(
-    "[from-user ML] sample normalized:",
-    normalized.slice(0, 1).map((p) => ({
-      keys: Object.keys(p),
-      solutionMoves: p.solutionMoves,
-    }))
-  );
-
-    console.log(
-    "[from-user ML] sample normalized:",
-    normalized.slice(0, 3).map((p) => ({
+    return {
+      // core position
       fen: p.fen,
+      sideToMove: p.sideToMove || p.side_to_move || "w",
       uci: p.uci,
-      len: p.solutionMoves.length,
-      solutionMoves: p.solutionMoves,
-    }))
-  );
+      san: p.san,
+      ply: p.ply,
+      moveNumber: p.moveNumber || p.move_number,
+
+      // eval features
+      pre_eval_cp: p.pre_eval_cp,
+      best_eval_cp: p.best_eval_cp,
+      played_eval_cp: p.played_eval_cp,
+      eval_gap_cp: p.eval_gap_cp,
+      heuristic_difficulty: p.heuristic_difficulty,
+      is_mate: p.is_mate,
+
+      // context
+      source_event: p.source_event,
+      source_game_id: p.source_game_id,
+      time_control: p.time_control,
+      time_class: p.time_class,
+      rated: !!p.rated,
+
+      // ML
+      ml_score: p.ml_score,
+
+      // solution: expose under BOTH names
+      moves: solutionMoves,
+      solutionMoves,
+    };
+  });
+
+  return normalized;
+
 
   return normalized;
 }
@@ -1712,7 +1627,8 @@ async function buildPuzzlesFromPGNWithEval({ pgn, username, maxPuzzles = 12, mov
         eval_gap_cp,
         heuristic_difficulty,
         is_mate,
-        solutionMoves,                  //  NEW
+        solutionMoves,
+        moves: solutionMoves,
       });
 
     } catch (e) {
@@ -1730,9 +1646,11 @@ async function buildPuzzlesFromPGNWithEval({ pgn, username, maxPuzzles = 12, mov
   try {
     scored = await scorePuzzlesWithPython(filtered);
   } catch (e) {
-    console.error("[from-game ML] scoring failed:", e);
-    // Fall back to just using eval_gap_cp as score
-    scored = filtered.map((p) => ({ ...p, ml_score: p.eval_gap_cp }));
+    console.error("[from-game ML] scoring failed, using sigmoid fallback:", e);
+    scored = filtered.map((p) => {
+      const estProb = 1 / (1 + Math.exp(-((p.eval_gap_cp || 0) - 100) / 100));
+      return { ...p, ml_score: estProb };
+    });
   }
 
   // Sort by ml_score desc and keep up to maxPuzzles
@@ -1740,6 +1658,7 @@ async function buildPuzzlesFromPGNWithEval({ pgn, username, maxPuzzles = 12, mov
 
   return scored.slice(0, maxPuzzles);
 }
+
 
 /*
 // HTTP endpoint: build puzzles from a single game PGN
@@ -1798,9 +1717,9 @@ app.post("/puzzles/from-user-ml", async (req, res) => {
     const uname = String(username || "").trim();
     if (!uname) return res.status(400).json({ ok: false, error: "missing username" });
 
-    const maxG = Number.isFinite(Number(maxGames)) ? Math.min(Math.max(Number(maxGames), 1), 50) : 15;
-    const maxP = Number.isFinite(Number(maxPuzzles)) ? Math.min(Math.max(Number(maxPuzzles), 1), 500) : 200;
-    const mt   = Number.isFinite(Number(movetimeMs)) ? Math.max(20, Math.min(Number(movetimeMs), 200)) : 60;
+    const maxG = Number.isFinite(Number(maxGames)) ? Math.min(Math.max(Number(maxGames), 1), 50) : 5;
+    const maxP = Number.isFinite(Number(maxPuzzles)) ? Math.min(Math.max(Number(maxPuzzles), 1), 500) : 100;
+    const mt   = Number.isFinite(Number(movetimeMs)) ? Math.max(20, Math.min(Number(movetimeMs), 200)) : 40;
 
     const puzzles = await buildUserRecentPuzzlesML({
       username: uname,
