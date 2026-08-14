@@ -76,3 +76,8 @@ engine/chess_engine
 # misc
 .DS_Store
 
+# aider
+*.aider
+
+# data
+data/
