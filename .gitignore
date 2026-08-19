@@ -82,4 +82,8 @@ engine/chess_engine
 # data
 data/
 
-docs_local
+docs_local/
+ 
+docs/
+
+scratch/
