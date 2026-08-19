@@ -174,18 +174,20 @@ def extract_solution_moves(p: dict) -> list[str]:
         return [p["uci"]]
     return []
 
-
-async def build_user_recent_puzzles_ml(
+async def get_user_recent_games(
     username: str,
     max_games: int = 15,
-    max_puzzles: int = 200,
-    movetime_ms: int = 60,
 ) -> list[dict]:
-    """Mirrors buildUserRecentPuzzlesML(): pull a user's recent games,
-    generate blunder-based puzzle candidates from each, then rank with the
-    ML scorer."""
+    """
+    Fetch and normalize a user's recent games.
+
+    This function only loads games. It does not run engine
+    analysis or generate puzzles.
+    """
     data = await get_recent_games(username, max_games)
+
     games = data.get("games") or []
+
     if not games:
         return []
 
@@ -194,10 +196,31 @@ async def build_user_recent_puzzles_ml(
         key=lambda g: g.get("end_time") or 0,
         reverse=True,
     )
-    selected = sorted_games[:max_games]
+
+    return sorted_games[:max_games]
+
+async def build_user_recent_puzzles_ml(
+    username: str,
+    max_games: int = 15,
+    max_puzzles: int = 200,
+    movetime_ms: int = 60,
+) -> list[dict]:
+    """
+    Pull a user's recent games, generate blunder-based puzzle
+    candidates from each, then rank with the ML scorer.
+    """
+
+    games = await get_user_recent_games(
+        username=username,
+        max_games=max_games,
+    )
+
+    if not games:
+        return []
 
     all_puzzles: list[dict] = []
-    for g in selected:
+
+    for g in games:
         try:
             puzzles = await build_eval_puzzles_from_pgn(
                 pgn=g["pgn"],
@@ -205,49 +228,89 @@ async def build_user_recent_puzzles_ml(
                 movetime_ms=movetime_ms,
                 max_puzzles_per_game=50,
             )
-            log.info("[from-user] game id=%s, got %d puzzles", g["id"], len(puzzles))
+
+            log.info(
+                "[from-user] game id=%s, got %d puzzles",
+                g["id"],
+                len(puzzles),
+            )
+
             for p in puzzles:
                 p["source_game_id"] = g["id"]
                 p["time_control"] = g.get("time_control")
                 p["time_class"] = g.get("time_class")
                 p["rated"] = bool(g.get("rated"))
-            all_puzzles.extend(puzzles)
-        except Exception as e:
-            log.error("[from-user] failed on game %s: %s", g.get("id"), e)
 
-    log.info("[from-user] total puzzles before ML: %d", len(all_puzzles))
+            all_puzzles.extend(puzzles)
+
+        except Exception as e:
+            log.error(
+                "[from-user] failed on game %s: %s",
+                g.get("id"),
+                e,
+            )
+
+    log.info(
+        "[from-user] total puzzles before ML: %d",
+        len(all_puzzles),
+    )
+
     if not all_puzzles:
         return []
 
     scored, used_fallback = score_puzzles(all_puzzles)
+
     thresh = 0.05 if used_fallback else 0.1
-    ml_puzzles = [p for p in scored if p.get("ml_score") is not None and p["ml_score"] >= thresh]
+
+    ml_puzzles = [
+        p
+        for p in scored
+        if p.get("ml_score") is not None
+        and p["ml_score"] >= thresh
+    ]
 
     log.info(
         "[from-user] ML accepted %d / %d candidates (threshold=%s)",
-        len(ml_puzzles), len(scored), thresh,
+        len(ml_puzzles),
+        len(scored),
+        thresh,
     )
 
-    ml_puzzles.sort(key=lambda p: p.get("ml_score") or 0, reverse=True)
+    ml_puzzles.sort(
+        key=lambda p: p.get("ml_score") or 0,
+        reverse=True,
+    )
+
     if len(ml_puzzles) > max_puzzles:
         ml_puzzles = ml_puzzles[:max_puzzles]
 
     normalized = []
+
     for p in ml_puzzles:
         solution_moves = extract_solution_moves(p)
+
         normalized.append(
             {
                 "fen": p.get("fen"),
-                "sideToMove": p.get("sideToMove") or p.get("side_to_move") or "w",
+                "sideToMove": (
+                    p.get("sideToMove")
+                    or p.get("side_to_move")
+                    or "w"
+                ),
                 "uci": p.get("uci"),
                 "san": p.get("san"),
                 "ply": p.get("ply"),
-                "moveNumber": p.get("moveNumber") or p.get("move_number"),
+                "moveNumber": (
+                    p.get("moveNumber")
+                    or p.get("move_number")
+                ),
                 "pre_eval_cp": p.get("pre_eval_cp"),
                 "best_eval_cp": p.get("best_eval_cp"),
                 "played_eval_cp": p.get("played_eval_cp"),
                 "eval_gap_cp": p.get("eval_gap_cp"),
-                "heuristic_difficulty": p.get("heuristic_difficulty"),
+                "heuristic_difficulty": p.get(
+                    "heuristic_difficulty"
+                ),
                 "is_mate": p.get("is_mate"),
                 "source_event": p.get("source_event"),
                 "source_game_id": p.get("source_game_id"),
@@ -261,7 +324,6 @@ async def build_user_recent_puzzles_ml(
         )
 
     return normalized
-
 
 async def build_puzzles_from_pgn_with_eval(
     pgn: str,

@@ -9,6 +9,7 @@ export class PuzzleView {
       daily: requireElement('btnDaily', root),
       random: requireElement('btnRandom', root),
       fromGames: requireElement('btnFromGames', root),
+      analyzeAll: requireElement('btnAnalyzeAll', root),
       flip: requireElement('btnFlip', root),
       viewMode: requireElement('viewMode', root),
       reset: requireElement('btnReset', root),
@@ -44,6 +45,7 @@ export class PuzzleView {
     this.elements.daily.addEventListener('click', handlers.onDaily);
     this.elements.random.addEventListener('click', handlers.onRandom);
     this.elements.fromGames.addEventListener('click', handlers.onFromGames);
+    this.elements.analyzeAll.addEventListener('click', handlers.onAnalyzeAll);
     this.elements.flip.addEventListener('click', handlers.onFlip);
     this.elements.viewMode.addEventListener('change', handlers.onViewModeChanged);
     this.elements.reset.addEventListener('click', handlers.onReset);
@@ -160,5 +162,9 @@ export class PuzzleView {
       button.addEventListener('click', () => onSelect(game));
       this.elements.gamesList.append(button);
     });
+  }
+
+  setAnalyzeAllVisible(visible) {
+  setVisible(this.elements.analyzeAll, visible);
   }
 }

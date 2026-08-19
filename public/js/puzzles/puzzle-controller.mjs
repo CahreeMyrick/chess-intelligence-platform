@@ -28,6 +28,7 @@ export class PuzzleController {
       onPrevious: () => this.showPreviousGamePuzzle(),
       onNext: () => this.showNextGamePuzzle(),
       onLoadGames: () => this.loadGamesForUser(),
+      onAnalyzeAll: () => this.analyzeAllGames(),
     });
     this.board.setSquareClickHandler((square) => this.handleSquareClick(square));
     this.view.renderSource(this.state.activeSource);
@@ -146,49 +147,76 @@ export class PuzzleController {
     this.applyGamePuzzleAt(previous);
   }
 
-  async loadGamesForUser() {
-    const username = this.view.getUsername();
-    if (!username) {
-      this.view.setGamesStatus('Enter a username');
+async loadGamesForUser() {
+  const username = this.view.getUsername();
+  if (!username) {
+    this.view.setGamesStatus('Enter a username');
+    return;
+  }
+
+  const version = ++this.loadVersion;
+  this.view.setLoading(true);
+  this.view.setGamesStatus('Loading games…');
+  this.view.setAnalyzeAllVisible(false);
+  this.state.fromGamePuzzles = [];
+  this.state.fromGameIndex = -1;
+  this.state.fromGame = null;
+  this.state.fromGameUsername = username;
+
+  try {
+    const recent = await this.api.getRecentGames(username);
+    if (version !== this.loadVersion) return;
+    const gameCount = Array.isArray(recent?.games) ? recent.games.length : 0;
+    this.view.renderGames(recent, (game) => this.startPuzzlesFromGame(username, game));
+    this.view.setAnalyzeAllVisible(gameCount > 0);
+    this.view.setGamesStatus(
+      gameCount ? `${gameCount} games loaded — pick one or analyze all` : 'No recent games found',
+    );
+  } catch (error) {
+    if (version !== this.loadVersion) return;
+    this.view.setGamesStatus('Failed to load games');
+    this.view.showFeedback('wrong', this.#errorMessage(error));
+  } finally {
+    if (version === this.loadVersion) this.view.setLoading(false);
+  }
+}
+
+async analyzeAllGames() {
+  const username = this.state.fromGameUsername ?? this.view.getUsername();
+  if (!username) {
+    this.view.setGamesStatus('Enter a username');
+    return;
+  }
+
+  const version = ++this.loadVersion;
+  this.view.setLoading(true);
+  this.view.setGamesStatus('Analyzing for puzzles…');
+  this.view.hideFeedback();
+
+  try {
+    const generated = await this.api.generatePuzzlesForUser({ username });
+    if (version !== this.loadVersion) return;
+    const puzzles = Array.isArray(generated?.puzzles) ? generated.puzzles : [];
+    if (!puzzles.length) {
+      this.view.setGamesStatus('No puzzles found');
+      this.view.showFeedback('wrong', 'No suitable puzzles found in your recent games.');
       return;
     }
 
-    const version = ++this.loadVersion;
-    this.view.setLoading(true);
-    this.view.setGamesStatus('Loading games…');
-    this.state.fromGamePuzzles = [];
-    this.state.fromGameIndex = -1;
+    this.state.fromGamePuzzles = puzzles;
+    this.state.fromGameUsername = username;
     this.state.fromGame = null;
-
-    try {
-      const recent = await this.api.getRecentGames(username);
-      if (version !== this.loadVersion) return;
-      this.view.renderGames(recent, (game) => this.startPuzzlesFromGame(username, game));
-      this.view.setGamesStatus('Analyzing for puzzles…');
-
-      const generated = await this.api.generatePuzzlesForUser({ username });
-      if (version !== this.loadVersion) return;
-      const puzzles = Array.isArray(generated?.puzzles) ? generated.puzzles : [];
-      if (!puzzles.length) {
-        this.view.setGamesStatus('No puzzles found');
-        this.view.showFeedback('wrong', 'No suitable puzzles found in your recent games.');
-        return;
-      }
-
-      this.state.fromGamePuzzles = puzzles;
-      this.state.fromGameUsername = username;
-      this.state.fromGameIndex = 0;
-      this.applyGamePuzzleAt(0);
-      this.view.setGamesStatus(`${puzzles.length} puzzles loaded`);
-    } catch (error) {
-      if (version !== this.loadVersion) return;
-      this.view.setGamesStatus('Failed to load games');
-      this.view.showFeedback('wrong', this.#errorMessage(error));
-    } finally {
-      if (version === this.loadVersion) this.view.setLoading(false);
-    }
+    this.state.fromGameIndex = 0;
+    this.applyGamePuzzleAt(0);
+    this.view.setGamesStatus(`${puzzles.length} puzzles loaded`);
+  } catch (error) {
+    if (version !== this.loadVersion) return;
+    this.view.setGamesStatus('Failed to analyze games');
+    this.view.showFeedback('wrong', this.#errorMessage(error));
+  } finally {
+    if (version === this.loadVersion) this.view.setLoading(false);
   }
-
+}
   async startPuzzlesFromGame(username, game) {
     if (!game?.pgn) {
       this.view.showFeedback('wrong', 'That game has no PGN.');
