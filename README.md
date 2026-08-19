@@ -82,6 +82,3 @@ Then open `http://localhost:8080/puzzles`.
 - `generate_puzzles_from_pgn.js` — puzzle generation from a raw PGN
 - `smoke-server.mjs`, `check-frontend.mjs` — smoke tests
 
-## Docs
-
-See `my_docs/` for architecture notes, API contracts, and component-level design documentation.
