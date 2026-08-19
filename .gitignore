@@ -1,4 +1,28 @@
-# --- CMake / build trees ---
+# =============================================================
+# Python
+# =============================================================
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# =============================================================
+# Node
+# =============================================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# =============================================================
+# CMake / C++ build trees
+# =============================================================
 /build/
 /build-*/
 /out/
@@ -8,8 +32,9 @@ CMakeFiles/
 CTestTestfile.cmake
 cmake_install.cmake
 Testing/
+compile_commands.json
 
-# --- Compilers / linkers ---
+# Compiled objects / binaries
 *.o
 *.obj
 *.lo
@@ -26,7 +51,7 @@ Testing/
 *.pdb
 *.ilk
 
-# --- Dependency & compile metadata ---
+# Dependency & compile metadata
 *.d
 *.gcno
 *.gcda
@@ -36,10 +61,17 @@ Testing/
 *.gmon.out
 .ipch/
 *.pch
-# If you generate this at project root and DON'T want to track it, uncomment:
-/compile_commands.json
 
-# --- Tools / IDEs / OS cruft ---
+# Runtime copy of engine binary
+engine/chess_engine
+
+# Model files (NNUE/ONNX experiments)
+*.nnue
+*.onnx
+
+# =============================================================
+# Editors / OS cruft
+# =============================================================
 .vscode/
 .idea/
 *.code-workspace
@@ -48,47 +80,24 @@ Testing/
 .DS_Store
 Thumbs.db
 
-# --- Project-specific junk ---
+# =============================================================
+# Logs / tmp
+# =============================================================
+*.log
+/tmp/
+*.aider
+
+# =============================================================
+# Project-specific
+# =============================================================
 /bench/**/logs/
 /perf/**/logs/
 /flamegraphs/
 /ProofPack/**/artifacts/
-/tmp/
-*.log
-
-# --- (Optional) model files if you experiment with NNUE/ONNX locally ---
-*.nnue
-*.onnx
 /practice/
-
-# node
-node_modules/
-npm-debug.log*
-
-# build outputs
-build/
-cmake-build*/
-*.o *.obj *.a *.lib *.dll *.so *.dylib
-
-# runtime copy of engine
-engine/chess_engine
-
-# misc
-.DS_Store
-
-# aider
-*.aider
-
-# data
 data/
-
-docs_local/
- 
-docs/
-
-scratch/
-
-my_docs/
-
 data_c/
 scratch_c/
+docs_local/
+docs/
+my_docs/
