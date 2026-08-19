@@ -141,8 +141,9 @@ struct UciBB {
 int main(){
     std::ios::sync_with_stdio(false);
     std::cin.tie(nullptr);
-
+    std::cout.setf(std::ios::unitbuf);
     UciBB E;
+
     std::string line;
 
     while (std::getline(std::cin, line)){

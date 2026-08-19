@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Items</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Items</h1>
+
+        <form id="item-form">
+            <input type="text" id="name" placeholder="Item name" required>
+            <input type="number" id="price" placeholder="Price" step="0.01" required>
+            <button type="submit">Add Item</button>
+        </form>
+
+        <ul id="item-list"></ul>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
