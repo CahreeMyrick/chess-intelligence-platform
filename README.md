@@ -33,7 +33,7 @@ scripts/               # ML training, puzzle scoring/export, smoke tests (dev to
 tests/                 # Backend, frontend, and engine tests
 ```
 
-> Note: `public/` is the frontend that is served by FastAPI.
+> Note: `frontend/`, `server.js`, and `package.json` are leftovers from an earlier Express/Node prototype and are no longer used. `public/` is the frontend that's actually served.
 
 ## Setup
 

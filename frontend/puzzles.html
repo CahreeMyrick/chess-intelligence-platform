@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Solve daily, random, and personalized Ichigo chess puzzles.">
+  <title>Ichigo Tactics</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,600;1,300&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./chessboardjs-1.0.0/css/chessboard-1.0.0.min.css">
+  <link rel="stylesheet" href="./css/base.css">
+  <link rel="stylesheet" href="./css/puzzles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-icon" aria-hidden="true">IG</div>
+      <div><div class="brand-name">ICHIGO</div><div class="brand-sub">tactics trainer</div></div>
+    </div>
+    <nav aria-label="Primary navigation">
+      <a href="/" class="nav-link">Play</a>
+      <a href="/puzzles" class="nav-link active" aria-current="page">Puzzles</a>
+      <a href="/dev" class="nav-link">Dev Lab</a>
+    </nav>
+  </header>
+
+  <main class="page">
+    <section class="main-col" aria-label="Puzzle board">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-label">Tactics</span>
+          <div class="source-control" role="group" aria-label="Puzzle source">
+            <button class="src-btn active" id="btnDaily" type="button">Daily</button>
+            <button class="src-btn" id="btnRandom" type="button">Random</button>
+            <button class="src-btn" id="btnFromGames" type="button">From Games</button>
+          </div>
+          <div class="controls-row">
+            <button class="btn btn-ghost btn-sm" id="btnFlip" type="button">⇅ Flip</button>
+            <select id="viewMode" aria-label="Board orientation">
+              <option value="side" selected>Side-to-move bottom</option>
+              <option value="white">White bottom</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="meta-strip">
+          <span class="meta-id" id="labId">—</span>
+          <span class="meta-sep">·</span>
+          <span class="meta-rating" id="labRating">—</span>
+          <span id="themesWrap"></span>
+          <span class="meta-turn" id="labTurn">White to move</span>
+        </div>
+
+        <div class="board-wrap"><div id="board" aria-label="Puzzle chess board"></div></div>
+        <div class="feedback-bar" id="feedbackBar" role="status" aria-live="polite">
+          <span class="feedback-icon" id="feedbackIcon"></span>
+          <span id="feedbackText"></span>
+        </div>
+
+        <div class="progress-wrap">
+          <div class="progress-row">
+            <span class="progress-label">Progress</span>
+            <span class="progress-count" id="progressCount">0 / 0</span>
+          </div>
+          <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+        </div>
+
+        <div class="action-bar">
+          <div class="action-left">
+            <button class="btn btn-ghost" id="btnPrevPuzzle" type="button" aria-label="Previous puzzle">◀</button>
+            <button class="btn btn-ghost" id="btnNextPuzzle" type="button" aria-label="Next puzzle">▶</button>
+            <button class="btn btn-ghost" id="btnReset" type="button">↺ Reset</button>
+          </div>
+          <div class="action-right">
+            <button class="btn btn-ghost" id="btnStep" type="button">Step →</button>
+            <button class="btn btn-ghost" id="btnAuto" type="button">▶ Auto</button>
+          </div>
+        </div>
+
+        <details class="solution-details">
+          <summary>Show solution UCI</summary>
+          <div class="solution-row"><span>UCI:</span><span class="solution-uci" id="solutionRaw">—</span></div>
+        </details>
+      </div>
+    </section>
+
+    <aside class="side-col" aria-label="Puzzle details">
+      <div class="card" id="fromGamesCard" style="display:none">
+        <div class="card-header">
+          <span class="card-label">Chess.com Games</span>
+          <div class="spin" id="loadSpin" style="display:none" aria-hidden="true"></div>
+        </div>
+        <div class="input-row">
+          <input id="usernameInput" type="text" placeholder="Chess.com username" autocomplete="off">
+          <button class="btn btn-primary" id="btnLoadGames" type="button">Load</button>
+        </div>
+        <div class="analyze-all-row">
+          <button class="btn btn-primary" id="btnAnalyzeAll" type="button" style="display:none">Analyze all games</button>
+        </div>
+        <div class="games-status" id="gamesStatus"></div>
+        <div class="games-list" id="gamesList">
+          <div class="games-empty">Enter a username and press Load to fetch recent games, then choose one to generate puzzles.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-label">Puzzle Info</span></div>
+        <div class="info-row"><span class="info-key">ID</span><span class="info-val" id="sideId">—</span></div>
+        <div class="info-row"><span class="info-key">Rating</span><span class="info-val" id="sideRating">—</span></div>
+        <div class="info-row"><span class="info-key">To move</span><span class="info-val" id="sideTurn">—</span></div>
+        <div class="info-row"><span class="info-key">Themes</span><span class="info-val" id="sideThemes">—</span></div>
+        <div class="info-row"><span class="info-key">Moves</span><span class="info-val" id="sideMoves">—</span></div>
+      </div>
+    </aside>
+  </main>
+
+  <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+  <script src="./chessboardjs-1.0.0/js/chessboard-1.0.0.min.js"></script>
+  <script type="module" src="./js/puzzles/puzzles.mjs"></script>
+</body>
+</html>
