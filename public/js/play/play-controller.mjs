@@ -56,7 +56,10 @@ export class PlayController {
       this.state.moves.push(uci);
       this.state.hintMove = null;
       this.state.inputLocked = true;
-      this.render();
+      this.board.clearHighlights();
+      this.board.highlightMove(uci, 'last-move');
+      this.view.renderMoves(this.state.moves);
+      this.view.renderClocks(this.clock.snapshot(), this.state.isActive ? this.state.position.sideToMove : null);
     } catch (error) {
       this.clock.start();
       if (error instanceof ChessDataError) this.view.log(`[local reject] ${error.message}`);
@@ -66,6 +69,10 @@ export class PlayController {
 
     void this.#commitPlayerMove(uci, memento);
     return undefined;
+  }
+
+  handleSnapEnd() {
+    this.render();
   }
 
   async startNewGame() {

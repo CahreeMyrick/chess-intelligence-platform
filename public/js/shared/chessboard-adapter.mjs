@@ -62,14 +62,16 @@ export class ChessboardAdapter {
   }
 
   #bindSquareClicks() {
-    this.container.addEventListener('pointerdown', () => {
-      this.ignoreNextClick = false;
-    });
-    this.container.addEventListener('pointermove', (event) => {
-      if (event.buttons) this.ignoreNextClick = true;
+    let startX = 0;
+    let startY = 0;
+    this.container.addEventListener('pointerdown', (event) => {
+      startX = event.clientX;
+      startY = event.clientY;
     });
     this.container.addEventListener('click', (event) => {
-      if (this.ignoreNextClick || !this.squareClickHandler) return;
+      if (!this.squareClickHandler) return;
+      const distance = Math.hypot(event.clientX - startX, event.clientY - startY);
+      if (distance > 6) return;
       const squareElement = event.target.closest('.square-55d63');
       if (!squareElement || !this.container.contains(squareElement)) return;
       const squareClass = [...squareElement.classList].find((name) => /^square-[a-h][1-8]$/.test(name));

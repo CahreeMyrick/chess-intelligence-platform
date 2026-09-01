@@ -20,10 +20,12 @@ const board = new ChessboardAdapter({
     sparePieces: false,
     orientation: 'white',
     pieceTheme: './chessboardjs-1.0.0/img/chesspieces/wikipedia/{piece}.png',
-    snapbackSpeed: 180,
-    snapSpeed: 80,
+    snapbackSpeed: 100,
+    snapSpeed: 40,
+    dragThrottleRate: 1,
     onDragStart: (source, piece) => controller?.canDrag(source, piece) ?? false,
     onDrop: (source, target) => controller?.handleDrop(source, target) ?? 'snapback',
+    onSnapEnd: () => controller?.handleSnapEnd?.(),
   },
 });
 

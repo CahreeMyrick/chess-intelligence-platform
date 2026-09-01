@@ -77,7 +77,16 @@ export class DevController {
       this.state.position.applyUci(uci);
       this.state.recordMove(uci);
       this.clock.switchTurn(movingColor);
-      this.render();
+      this.board.clearHighlights();
+      this.board.highlightMove(uci, 'last-move');
+      this.view.renderMoves(this.state.moves);
+      const clockSnapshot = this.clock.snapshot();
+      this.view.updateClocks({
+        remaining: clockSnapshot.remaining,
+        activeColor: this.state.sideToMove,
+        timerMode: this.state.timerMode,
+        whiteAtBottom: this.state.whiteAtBottom,
+      });
 
       this.pluginManager?.emit('moveApplied', {
         uci,
@@ -107,6 +116,10 @@ export class DevController {
     }
 
     return undefined;
+  }
+
+  handleSnapEnd() {
+    this.render();
   }
 
   async startNewGame() {

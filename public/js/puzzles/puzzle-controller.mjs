@@ -43,7 +43,11 @@ export class PuzzleController {
 
   handleDrop(source, target) {
     if (source === target || target === 'offboard') return 'snapback';
-    return this.#attemptUserMove(source, target) ? undefined : 'snapback';
+    return this.#attemptUserMove(source, target, { isDrop: true }) ? undefined : 'snapback';
+  }
+
+  handleSnapEnd() {
+    this.render();
   }
 
   handleSquareClick(square) {
@@ -347,7 +351,7 @@ async analyzeAllGames() {
     }
   }
 
-  #attemptUserMove(source, target) {
+  #attemptUserMove(source, target, { isDrop = false } = {}) {
     if (this.state.validationError) return false;
     const expected = this.state.expectedMove;
     if (!expected) return false;
@@ -359,7 +363,7 @@ async analyzeAllGames() {
       return false;
     }
 
-    if (!this.#applyExpectedMove()) return false;
+    if (!this.#applyExpectedMove({ isDrop })) return false;
     this.view.hideFeedback();
     if (this.state.solved) {
       this.view.showFeedback('correct', 'Solved! Well done.');
@@ -369,7 +373,7 @@ async analyzeAllGames() {
     return true;
   }
 
-  #applyExpectedMove() {
+  #applyExpectedMove({ isDrop = false } = {}) {
     if (this.state.validationError) return false;
     const expected = this.state.expectedMove;
     if (!expected) return false;
@@ -378,7 +382,13 @@ async analyzeAllGames() {
       this.state.index += 1;
       this.state.selectedSquare = null;
       this.state.lastMove = expected;
-      this.render();
+      if (isDrop) {
+        this.renderHighlights();
+        this.view.renderTurn(this.state.position.sideToMove === 'w' ? 'White to move' : 'Black to move');
+        this.view.renderProgress(this.state.index, this.state.solution.length);
+      } else {
+        this.render();
+      }
       return true;
     } catch (error) {
       this.view.showFeedback('wrong', `Puzzle data mismatch: ${error.message}`);

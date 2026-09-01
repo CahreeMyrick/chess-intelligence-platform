@@ -56,6 +56,20 @@
   // ---------------------------------------------------------------------------
 
   function throttle (f, interval, scope) {
+    if (interval <= 16 && typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      var rafId = 0
+      var lastArgs = null
+      return function () {
+        lastArgs = arguments
+        if (!rafId) {
+          rafId = window.requestAnimationFrame(function () {
+            rafId = 0
+            f.apply(scope, lastArgs)
+          })
+        }
+      }
+    }
+
     var timeout = 0
     var shouldFire = false
     var args = []
