@@ -37,7 +37,17 @@ app.include_router(games.router)
 app.include_router(chesscom.router)
 app.include_router(puzzles.router)
 
+from fastapi.responses import FileResponse
+
 # ---- static files, mirrors app.use(express.static(path.join(__dirname, "public"))) ----
 public_dir = BASE_DIR / "public"
 public_dir.mkdir(exist_ok=True)
+
+
+@app.get("/dev")
+async def dev_page():
+    return FileResponse(public_dir / "dev.html")
+
+
 app.mount("/", StaticFiles(directory=public_dir, html=True), name="static")
+

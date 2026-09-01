@@ -21,6 +21,7 @@
     <nav aria-label="Primary navigation">
       <a href="/" class="nav-link">Play</a>
       <a href="/puzzles" class="nav-link active" aria-current="page">Puzzles</a>
+      <a href="/dev" class="nav-link">Dev Lab</a>
     </nav>
   </header>
 
@@ -93,6 +94,9 @@
         <div class="input-row">
           <input id="usernameInput" type="text" placeholder="Chess.com username" autocomplete="off">
           <button class="btn btn-primary" id="btnLoadGames" type="button">Load</button>
+        </div>
+        <div class="analyze-all-row">
+          <button class="btn btn-primary" id="btnAnalyzeAll" type="button" style="display:none">Analyze all games</button>
         </div>
         <div class="games-status" id="gamesStatus"></div>
         <div class="games-list" id="gamesList">

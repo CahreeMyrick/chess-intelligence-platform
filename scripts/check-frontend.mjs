@@ -34,6 +34,7 @@ for (const modulePath of modules) {
 const htmlContracts = [
   { html: 'index.html', view: join(jsRoot, 'play', 'play-view.mjs') },
   { html: 'puzzles.html', view: join(jsRoot, 'puzzles', 'puzzle-view.mjs') },
+  { html: 'dev.html', view: join(jsRoot, 'dev', 'dev-view.mjs') },
 ];
 
 for (const contract of htmlContracts) {
